@@ -1,0 +1,6 @@
+{
+  "name": "CS Scholar OS",
+  "description": "Personal AI operating system and academic mentor for international CS & Tech students in China",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
