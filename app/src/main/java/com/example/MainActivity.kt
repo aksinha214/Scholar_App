@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleWidgetNavigation(intent)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -66,6 +68,21 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleWidgetNavigation(intent)
+    }
+
+    private fun handleWidgetNavigation(intent: Intent?) {
+        if (intent == null) return
+        when (intent.getStringExtra("NAV_TARGET")) {
+            "command_center" -> viewModel.navigateTo(com.example.ui.viewmodel.AppScreen.COMMAND_CENTER)
+            "university" -> viewModel.navigateTo(com.example.ui.viewmodel.AppScreen.UNIVERSITY)
+            "research" -> viewModel.navigateTo(com.example.ui.viewmodel.AppScreen.RESEARCH_LAB)
+            "chinese" -> viewModel.navigateTo(com.example.ui.viewmodel.AppScreen.CHINESE_LANGUAGE)
         }
     }
 }

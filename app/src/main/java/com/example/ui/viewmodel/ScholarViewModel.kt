@@ -2139,7 +2139,11 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
         allResearchMilestones,
         chineseVocabulary
     ) { _, _, _, _ ->
-        CommandCenterEngine.generateTodayBriefing(getUnifiedContext())
+        val briefing = CommandCenterEngine.generateTodayBriefing(getUnifiedContext())
+        try {
+            com.example.widget.ScholarAppWidgetProvider.updateAllWidgets(getApplication())
+        } catch (_: Exception) {}
+        briefing
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),

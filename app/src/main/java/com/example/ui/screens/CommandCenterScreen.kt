@@ -351,7 +351,7 @@ fun CommandCenterScreen(viewModel: ScholarViewModel) {
                                     }
                                 },
                                 modifier = Modifier
-                                    .size(44.dp)
+                                    .size(48.dp)
                                     .testTag("voice_dictation_btn"),
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = if (voiceState is VoiceInputState.Listening) ScholarCyan else MaterialTheme.colorScheme.surfaceVariant

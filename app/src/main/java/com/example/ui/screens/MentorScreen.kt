@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -338,12 +339,12 @@ fun MentorScreen(viewModel: ScholarViewModel) {
                     },
                     enabled = inputText.isNotBlank() && !isGenerating,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(if (inputText.isNotBlank() && !isGenerating) DarkPrimary else MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Send,
+                        imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Send",
                         tint = if (inputText.isNotBlank() && !isGenerating) DarkOnPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                     )

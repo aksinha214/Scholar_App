@@ -85,7 +85,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "cs_scholar_os.db"
                 )
-                .fallbackToDestructiveMigration()
                 .addCallback(DatabaseCallback(context.applicationContext))
                 .build()
                 INSTANCE = instance
