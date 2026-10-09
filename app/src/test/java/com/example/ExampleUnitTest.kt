@@ -1133,5 +1133,141 @@ class ExampleUnitTest {
         assertTrue(steps[2].responsibleParty.contains("Employer"))
         assertEquals("Candidate & Local Exit-Entry Administration", steps[4].responsibleParty)
     }
+
+    @Test
+    fun testHsk1to3QuizzesAndCuratedVocabulary() {
+        val hsk1Quizzes = ChineseCoachEngine.getHskQuizzes("HSK 1")
+        assertEquals(5, hsk1Quizzes.size)
+        assertEquals("HSK 1", hsk1Quizzes[0].level)
+        assertTrue(hsk1Quizzes[0].options.size >= 4)
+        assertTrue(hsk1Quizzes[0].explanation.isNotBlank())
+
+        val hsk2Quizzes = ChineseCoachEngine.getHskQuizzes("HSK 2")
+        assertEquals(5, hsk2Quizzes.size)
+        assertEquals("HSK 2", hsk2Quizzes[0].level)
+
+        val hsk3Quizzes = ChineseCoachEngine.getHskQuizzes("HSK 3")
+        assertEquals(5, hsk3Quizzes.size)
+        assertEquals("HSK 3", hsk3Quizzes[0].level)
+
+        val curatedVocab = ChineseCoachEngine.getCuratedHskVocabulary("scholar@test.edu")
+        assertTrue(curatedVocab.isNotEmpty())
+        assertTrue(curatedVocab.any { it.hskLevel == "HSK 1" })
+        assertTrue(curatedVocab.any { it.hskLevel == "HSK 2" })
+        assertTrue(curatedVocab.any { it.hskLevel == "HSK 3" })
+        assertTrue(curatedVocab.all { it.hanzi.isNotBlank() && it.pinyin.isNotBlank() && it.english.isNotBlank() })
+    }
+
+    @Test
+    fun testAcademicLearningAdvisorGeneratesContextualRecommendations() {
+        val profile = UserProfileEntity(
+            id = 1,
+            name = "Alex Scholar",
+            nationality = "International",
+            university = "Yanshan University",
+            department = "School of Information Science",
+            degree = "Bachelor of Engineering in CS",
+            currentSemester = "Fall 2026",
+            expectedGraduation = "June 2027",
+            researchInterests = "Computer Vision, 3D Point Clouds, Autonomous Navigation",
+            technicalSkills = "Python, PyTorch",
+            programmingLanguages = "Python, C++",
+            aiMlSkills = "Deep Learning",
+            cvSkills = "Point Clouds",
+            researchExperience = "Lab Fellow",
+            publications = "None",
+            projects = "LiDAR-FogNet",
+            githubUrl = "https://github.com/scholar",
+            certifications = "NVIDIA DLI",
+            chineseProficiency = "HSK 5",
+            englishProficiency = "Fluent",
+            careerGoals = "AI Research Scientist",
+            targetIndustries = "Autonomous Driving",
+            targetCountries = "China, Singapore",
+            targetCompanies = "DeepSeek, Baidu Apollo",
+            targetUniversities = "Tsinghua",
+            targetVenues = "CVPR",
+            currentAcademicTasks = "Complete OS lab",
+            currentResearchProjects = "Point Cloud Benchmark"
+        )
+        val courses = listOf(
+            CourseEntity(
+                code = "CS301",
+                name = "Advanced Algorithms",
+                professorName = "Prof. Wang",
+                professorContact = "wang@ysu.edu.cn",
+                credits = 3,
+                classroom = "Room 4-302",
+                scheduleTime = "Mon 08:00-09:35"
+            )
+        )
+        val skills = listOf(
+            SkillItemEntity(name = "Python & PyTorch", category = "AI", level = "Intermediate")
+        )
+
+        val recommendations = AcademicLearningAdvisor.generateCourseAndSkillRecommendations(
+            profile = profile,
+            courses = courses,
+            skills = skills,
+            researchInterests = profile.researchInterests,
+            targetHskLevel = profile.chineseProficiency
+        )
+
+        assertTrue(recommendations.isNotEmpty())
+        // Since vision is focused but CUDA is missing, should recommend CUDA
+        assertTrue(recommendations.any { it.id == "rec_cuda_acceleration" })
+        // Since HSK 5 is target and technical Chinese is missing, should recommend Technical Chinese
+        assertTrue(recommendations.any { it.id == "rec_technical_chinese" })
+        assertTrue(recommendations.all { it.whyRecommended.isNotBlank() && it.suggestedAction.isNotBlank() })
+    }
+
+    @Test
+    fun testScholarSessionPersistenceModel() {
+        val profile = UserProfileEntity(
+            id = 1,
+            name = "International Scholar",
+            nationality = "International",
+            university = "Yanshan University",
+            department = "School of Information Science",
+            degree = "B.Eng CS",
+            currentSemester = "Fall 2026",
+            expectedGraduation = "June 2027",
+            researchInterests = "AI",
+            technicalSkills = "Python",
+            programmingLanguages = "Python",
+            aiMlSkills = "ML",
+            cvSkills = "CV",
+            researchExperience = "Fellow",
+            publications = "None",
+            projects = "AI Project",
+            githubUrl = "https://github.com/test",
+            certifications = "None",
+            chineseProficiency = "HSK 4",
+            englishProficiency = "Fluent",
+            careerGoals = "Researcher",
+            targetIndustries = "AI",
+            targetCountries = "China",
+            targetCompanies = "Tech Co",
+            targetUniversities = "YSU",
+            targetVenues = "CVPR",
+            currentAcademicTasks = "Study",
+            currentResearchProjects = "Thesis"
+        )
+        val account = com.example.data.auth.ScholarAccount(
+            email = "scholar@ysu.edu.cn",
+            studentId = "YSU202688",
+            fullName = "International Scholar",
+            passwordHash = "hash123",
+            salt = "salt123",
+            university = "Yanshan University",
+            department = "School of Information Science",
+            degree = "B.Eng CS",
+            nationality = "International",
+            profile = profile
+        )
+        assertEquals("scholar@ysu.edu.cn", account.email)
+        assertEquals("International Scholar", account.fullName)
+        assertEquals("YSU202688", account.studentId)
+    }
 }
 

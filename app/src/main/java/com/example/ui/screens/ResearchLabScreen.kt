@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.*
 import com.example.data.model.*
 import com.example.ui.components.FactBadge
+import com.example.ui.components.ModuleTabBar
 import com.example.ui.components.SectionHeader
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.ScholarViewModel
@@ -62,6 +63,8 @@ fun ResearchLabScreen(viewModel: ScholarViewModel) {
     // Dialog states
     var showNewProjectDialog by remember { mutableStateOf(false) }
     var showEditProjectDialog by remember { mutableStateOf(false) }
+    var projectToDelete by remember { mutableStateOf<ResearchProjectEntity?>(null) }
+    var experimentToDelete by remember { mutableStateOf<ResearchExperimentEntity?>(null) }
     var showAddMilestoneDialog by remember { mutableStateOf(false) }
     var showAddPaperDialog by remember { mutableStateOf(false) }
     var showAddExperimentDialog by remember { mutableStateOf(false) }
@@ -73,6 +76,7 @@ fun ResearchLabScreen(viewModel: ScholarViewModel) {
     var selectedSectionForEdit by remember { mutableStateOf<ManuscriptSectionEntity?>(null) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             when (selectedTab) {
                 0 -> {
@@ -120,27 +124,12 @@ fun ResearchLabScreen(viewModel: ScholarViewModel) {
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Scrollable Tab Row for all 6 tabs
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = ScholarCyan,
-                edgePadding = 12.dp
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Text(
-                                title,
-                                fontSize = 12.sp,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
-                }
-            }
+            // Unified Tab Row for all 6 tabs
+            ModuleTabBar(
+                tabs = tabs,
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it }
+            )
 
             // Tab Content
             when (selectedTab) {
@@ -153,7 +142,7 @@ fun ResearchLabScreen(viewModel: ScholarViewModel) {
                     onSelectProject = { viewModel.selectResearchProject(it) },
                     onToggleActive = { id, act -> viewModel.toggleProjectActive(id, act) },
                     onEditProject = { showEditProjectDialog = true },
-                    onDeleteProject = { viewModel.deleteResearchProject(it) },
+                    onDeleteProject = { projectToDelete = it },
                     onNewProject = { showNewProjectDialog = true }
                 )
                 1 -> MilestonesView(
@@ -187,7 +176,7 @@ fun ResearchLabScreen(viewModel: ScholarViewModel) {
                     project = activeProject,
                     onSelectExperiment = { selectedExperimentForDetail = it },
                     onAddExperiment = { showAddExperimentDialog = true },
-                    onDeleteExperiment = { viewModel.deleteResearchExperiment(it) }
+                    onDeleteExperiment = { experimentToDelete = it }
                 )
                 5 -> ManuscriptAndBriefView(
                     project = activeProject,
@@ -349,6 +338,30 @@ fun ResearchLabScreen(viewModel: ScholarViewModel) {
         BibTeXExportDialog(
             bibtexContent = viewModel.exportProjectBibTeX(),
             onDismiss = { showBibtexExportDialog = false }
+        )
+    }
+
+    if (projectToDelete != null) {
+        com.example.ui.components.DeleteConfirmationDialog(
+            title = "Delete Research Project",
+            message = "Are you sure you want to delete '${projectToDelete!!.title}'? This will remove all associated lab notes and matrix entries.",
+            onConfirm = {
+                viewModel.deleteResearchProject(projectToDelete!!)
+                projectToDelete = null
+            },
+            onDismiss = { projectToDelete = null }
+        )
+    }
+
+    if (experimentToDelete != null) {
+        com.example.ui.components.DeleteConfirmationDialog(
+            title = "Delete Experiment Record",
+            message = "Are you sure you want to remove experiment '${experimentToDelete!!.experimentId}: ${experimentToDelete!!.name}'?",
+            onConfirm = {
+                viewModel.deleteResearchExperiment(experimentToDelete!!)
+                experimentToDelete = null
+            },
+            onDismiss = { experimentToDelete = null }
         )
     }
 }

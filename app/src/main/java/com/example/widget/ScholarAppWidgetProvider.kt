@@ -117,7 +117,8 @@ class ScholarAppWidgetProvider : AppWidgetProvider() {
                     }
 
                     // 4. Chinese Practice
-                    val userEmail = "alexei.chen@ysu.edu.cn"
+                    val userEmail = context.getSharedPreferences("cs_scholar_session", Context.MODE_PRIVATE)
+                        .getString("user_email", "alexei.chen@ysu.edu.cn") ?: "alexei.chen@ysu.edu.cn"
                     val vocabList = db.chineseDao().getAllVocabulary(userEmail).firstOrNull() ?: emptyList()
                     val dueCount = vocabList.count { it.reviewStatus == "Due" || it.reviewStatus == "New" || !it.isKnown }
                     val chineseText = if (dueCount > 0) {

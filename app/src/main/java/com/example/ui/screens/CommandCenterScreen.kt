@@ -75,6 +75,7 @@ fun CommandCenterScreen(viewModel: ScholarViewModel) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {

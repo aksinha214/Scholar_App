@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.ChineseCoachEngine
 import com.example.data.model.*
 import com.example.ui.components.FactBadge
+import com.example.ui.components.ModuleTabBar
 import com.example.ui.components.SectionHeader
 import com.example.ui.screens.chinese.CharacterPracticeCanvas
 import com.example.ui.screens.chinese.SpeakingEvaluationCard
@@ -62,27 +63,12 @@ fun ChineseScreen(viewModel: ScholarViewModel) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Scrollable Tab Row for Chinese Coach sub-modules
-        ScrollableTabRow(
-            selectedTabIndex = selectedMainTab,
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = ScholarCyan,
-            edgePadding = 12.dp
-        ) {
-            mainTabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedMainTab == index,
-                    onClick = { selectedMainTab = index },
-                    text = {
-                        Text(
-                            text = title,
-                            fontSize = 12.sp,
-                            fontWeight = if (selectedMainTab == index) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                )
-            }
-        }
+        // Unified Navigation Tabs for Chinese Coach sub-modules
+        ModuleTabBar(
+            tabs = mainTabs,
+            selectedTab = selectedMainTab,
+            onTabSelected = { selectedMainTab = it }
+        )
 
         when (selectedMainTab) {
             0 -> ChineseDashboardTab(
@@ -434,6 +420,7 @@ fun ChineseVocabularyTab(
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") } // "All", "Due", "Upcoming", "Mastered", "Favorites"
     var showAddDialog by remember { mutableStateOf(false) }
+    var vocabToDelete by remember { mutableStateOf<ChineseVocabularyEntity?>(null) }
 
     val filteredList = remember(vocabulary, searchQuery, selectedFilter) {
         vocabulary.filter { v ->
@@ -542,7 +529,7 @@ fun ChineseVocabularyTab(
                     onToggleKnown = { viewModel.toggleChineseVocabKnown(vocab.id, !vocab.isKnown) },
                     onToggleDifficult = { viewModel.toggleChineseVocabDifficult(vocab.id, !vocab.isDifficult) },
                     onReview = { isCorrect, diff -> viewModel.reviewVocabularyItem(vocab, isCorrect, diff) },
-                    onDelete = { viewModel.deleteChineseVocabulary(vocab) }
+                    onDelete = { vocabToDelete = vocab }
                 )
             }
         }
@@ -555,6 +542,18 @@ fun ChineseVocabularyTab(
                 viewModel.addChineseVocabulary(item)
                 showAddDialog = false
             }
+        )
+    }
+
+    if (vocabToDelete != null) {
+        com.example.ui.components.DeleteConfirmationDialog(
+            title = "Delete Vocabulary Word",
+            message = "Are you sure you want to remove '${vocabToDelete!!.hanzi}' (${vocabToDelete!!.pinyin}) from your vocabulary deck?",
+            onConfirm = {
+                viewModel.deleteChineseVocabulary(vocabToDelete!!)
+                vocabToDelete = null
+            },
+            onDismiss = { vocabToDelete = null }
         )
     }
 }
@@ -718,9 +717,16 @@ fun ChineseHskTab(
     viewModel: ScholarViewModel,
     grammarPoints: List<ChineseGrammarPointEntity>
 ) {
-    var selectedHskIndex by remember { mutableStateOf(3) } // default HSK 4
-    val hskLevels = remember { ChineseCoachEngine.getOfficialHskLevels() }
+    var selectedHskIndex by remember { mutableStateOf(0) } // Default HSK 1
+    val hskLevels = remember { ChineseCoachEngine.getOfficialHskLevels().take(3) } // Strict focus on HSK 1, 2, 3
     val currentLevelData = hskLevels.getOrNull(selectedHskIndex) ?: hskLevels[0]
+    val currentQuizQuestions = remember(currentLevelData.level) {
+        ChineseCoachEngine.getHskQuizzes(currentLevelData.level)
+    }
+
+    var selectedQuizIndex by remember { mutableStateOf(0) }
+    var selectedOptionIndex by remember { mutableStateOf<Int?>(null) }
+    var showQuizExplanation by remember { mutableStateOf(false) }
 
     val filteredGrammar = remember(grammarPoints, currentLevelData) {
         grammarPoints.filter { it.hskLevel.equals(currentLevelData.level, ignoreCase = true) }
@@ -734,25 +740,33 @@ fun ChineseHskTab(
     ) {
         item {
             SectionHeader(
-                title = "HSK Curated Syllabus & Practice",
-                subtitle = "Standard Levels 1 through 6 • Verified learning targets"
+                title = "HSK 1–3 Structured Mastery",
+                subtitle = "Foundations, Campus Routine, and Academic Fluency (Levels 1–3)"
             )
         }
 
-        // HSK Level selector tabs
+        // HSK Level selector tabs (HSK 1, HSK 2, HSK 3)
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(hskLevels.indices.toList()) { idx ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                hskLevels.forEachIndexed { idx, lvl ->
                     val isSelected = selectedHskIndex == idx
-                    val lvl = hskLevels[idx]
                     FilterChip(
                         selected = isSelected,
-                        onClick = { selectedHskIndex = idx },
+                        onClick = {
+                            selectedHskIndex = idx
+                            selectedQuizIndex = 0
+                            selectedOptionIndex = null
+                            showQuizExplanation = false
+                        },
                         label = { Text(lvl.level, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = DarkPrimary,
                             selectedLabelColor = DarkOnPrimary
-                        )
+                        ),
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -807,12 +821,120 @@ fun ChineseHskTab(
                             style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFCBD5E1), fontSize = 12.sp)
                         )
                     }
+                }
+            }
+        }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Writing Focus: ${currentLevelData.writingFocus}",
-                        style = MaterialTheme.typography.bodySmall.copy(color = ScholarGold, fontSize = 12.sp)
-                    )
+        // Interactive HSK Quiz & Verification Practice
+        if (currentQuizQuestions.isNotEmpty()) {
+            item {
+                val q = currentQuizQuestions.getOrNull(selectedQuizIndex) ?: currentQuizQuestions[0]
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${currentLevelData.level} Practice Quiz (Question ${selectedQuizIndex + 1}/${currentQuizQuestions.size})",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = ScholarCyan)
+                            )
+                            IconButton(onClick = { viewModel.speakChinese(q.questionPrompt) }) {
+                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Listen", tint = ScholarCyan)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = q.questionPrompt,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+                        q.options.forEachIndexed { optIdx, optText ->
+                            val isChosen = selectedOptionIndex == optIdx
+                            val isCorrect = optIdx == q.correctIndex
+                            val btnColor = if (showQuizExplanation) {
+                                if (isCorrect) ScholarGreen else if (isChosen) Color(0xFFEF4444) else MaterialTheme.colorScheme.surface
+                            } else {
+                                if (isChosen) DarkPrimary else MaterialTheme.colorScheme.surface
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable {
+                                        if (!showQuizExplanation) {
+                                            selectedOptionIndex = optIdx
+                                            showQuizExplanation = true
+                                        }
+                                    },
+                                color = btnColor,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${('A' + optIdx)}. $optText",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontWeight = if (isChosen) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (showQuizExplanation && isCorrect) Color.Black else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        if (showQuizExplanation) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                color = Color(0x33000000),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    val wasCorrect = selectedOptionIndex == q.correctIndex
+                                    Text(
+                                        text = if (wasCorrect) "✓ Correct!" else "✗ Incorrect",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (wasCorrect) ScholarGreen else Color(0xFFEF4444)
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = q.explanation,
+                                        style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFCBD5E1), fontSize = 11.5.sp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Button(
+                                    onClick = {
+                                        selectedQuizIndex = (selectedQuizIndex + 1) % currentQuizQuestions.size
+                                        selectedOptionIndex = null
+                                        showQuizExplanation = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = DarkPrimary)
+                                ) {
+                                    Text(if (selectedQuizIndex + 1 < currentQuizQuestions.size) "Next Question" else "Restart Quiz", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -831,7 +953,7 @@ fun ChineseHskTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "阅读理解 (Sample Reading)",
+                            text = "阅读理解 (Reading Practice)",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = ScholarCyan)
                         )
                         IconButton(onClick = { viewModel.speakChinese(currentLevelData.sampleReading) }) {
@@ -862,7 +984,7 @@ fun ChineseHskTab(
             item {
                 SectionHeader(
                     title = "Grammar Points for ${currentLevelData.level}",
-                    subtitle = "Structures and common pitfalls"
+                    subtitle = "Sentence patterns and usage guidelines"
                 )
             }
             items(filteredGrammar) { gp ->

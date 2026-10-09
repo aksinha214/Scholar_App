@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.ImmigrationIntelligenceEngine
 import com.example.data.model.*
 import com.example.ui.components.FactBadge
+import com.example.ui.components.ModuleTabBar
 import com.example.ui.components.SectionHeader
 import com.example.ui.screens.chinawork.*
 import com.example.ui.theme.*
@@ -116,27 +117,12 @@ fun ChinaWorkScreen(viewModel: ScholarViewModel) {
             )
         }
 
-        // Scrollable Navigation Tabs
-        ScrollableTabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = ScholarCyan,
-            edgePadding = 12.dp
-        ) {
-            tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = {
-                        Text(
-                            text = title,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                )
-            }
-        }
+        // Unified Navigation Tabs
+        ModuleTabBar(
+            tabs = tabs,
+            selectedTab = selectedTab,
+            onTabSelected = { selectedTab = it }
+        )
 
         // Main Tab Content
         Box(modifier = Modifier.weight(1f)) {

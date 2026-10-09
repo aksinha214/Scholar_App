@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.*
 import com.example.data.model.*
 import com.example.ui.components.FactBadge
+import com.example.ui.components.ModuleTabBar
 import com.example.ui.components.SectionHeader
 import com.example.ui.components.StatusTag
 import com.example.ui.theme.*
@@ -62,6 +63,10 @@ fun UniversityScreen(viewModel: ScholarViewModel) {
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var showAddCourseDialog by remember { mutableStateOf(false) }
     var selectedCourseForDetail by remember { mutableStateOf<CourseEntity?>(null) }
+    var courseToDelete by remember { mutableStateOf<CourseEntity?>(null) }
+    var courseToEdit by remember { mutableStateOf<CourseEntity?>(null) }
+    var taskToDelete by remember { mutableStateOf<AcademicTaskEntity?>(null) }
+    var taskToEdit by remember { mutableStateOf<AcademicTaskEntity?>(null) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var showImportTimetableDialog by remember { mutableStateOf(false) }
     var showBreakdownDialog by remember { mutableStateOf(false) }
@@ -71,6 +76,7 @@ fun UniversityScreen(viewModel: ScholarViewModel) {
     var courseForAttendanceEdit by remember { mutableStateOf<CourseEntity?>(null) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             when (selectedTab) {
                 0, 1 -> {
@@ -164,27 +170,12 @@ fun UniversityScreen(viewModel: ScholarViewModel) {
                 }
             }
 
-            // Scrollable Tab Row for all 7 modules
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = DarkPrimary,
-                edgePadding = 12.dp
-            ) {
-                tabTitles.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Text(
-                                title,
-                                fontSize = 12.sp,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
-                }
-            }
+            // Unified Tab Row for all 7 modules
+            ModuleTabBar(
+                tabs = tabTitles,
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it }
+            )
 
             // Main Tab Content
             Box(modifier = Modifier.weight(1f)) {
@@ -213,7 +204,8 @@ fun UniversityScreen(viewModel: ScholarViewModel) {
                         onCourseClick = { selectedCourseForDetail = it },
                         onLogAttendance = { id, act -> viewModel.logAttendance(id, act) },
                         onEditAttendanceClick = { courseForAttendanceEdit = it },
-                        onDeleteCourse = { viewModel.deleteCourse(it) },
+                        onEditCourse = { courseToEdit = it },
+                        onDeleteCourse = { courseToDelete = it },
                         onAddCourseClick = { showAddCourseDialog = true }
                     )
                     3 -> AssignmentsAndExtractionTab(
@@ -221,7 +213,8 @@ fun UniversityScreen(viewModel: ScholarViewModel) {
                         courses = courses,
                         onToggleTask = { id, comp -> viewModel.toggleTask(id, comp) },
                         onUpdateStatus = { id, status -> viewModel.updateTaskStatus(id, status) },
-                        onDeleteTask = { viewModel.deleteTask(it) },
+                        onEditTask = { taskToEdit = it },
+                        onDeleteTask = { taskToDelete = it },
                         onAddTaskClick = { showAddTaskDialog = true },
                         onBreakdownClick = { showBreakdownDialog = true },
                         onExtractDocClick = { showExtractDocDialog = true }
@@ -282,6 +275,18 @@ fun UniversityScreen(viewModel: ScholarViewModel) {
         )
     }
 
+    // 2b. Edit Course Dialog
+    courseToEdit?.let { course ->
+        EditCourseDialog(
+            course = course,
+            onDismiss = { courseToEdit = null },
+            onConfirm = { updated ->
+                viewModel.updateCourse(updated)
+                courseToEdit = null
+            }
+        )
+    }
+
     // 3. Course Detail Dialog
     selectedCourseForDetail?.let { course ->
         CourseDetailDialog(
@@ -305,6 +310,19 @@ fun UniversityScreen(viewModel: ScholarViewModel) {
             onConfirm = { task ->
                 viewModel.insertTask(task)
                 showAddTaskDialog = false
+            }
+        )
+    }
+
+    // 4b. Edit Task Dialog
+    taskToEdit?.let { task ->
+        EditTaskDialog(
+            task = task,
+            courses = courses,
+            onDismiss = { taskToEdit = null },
+            onConfirm = { updated ->
+                viewModel.updateTask(updated)
+                taskToEdit = null
             }
         )
     }
@@ -400,6 +418,31 @@ fun UniversityScreen(viewModel: ScholarViewModel) {
                 viewModel.updateCourseAttendanceDirect(course.id, attended, absent, excused)
                 courseForAttendanceEdit = null
             }
+        )
+    }
+
+    // 12. Delete Confirmations
+    if (courseToDelete != null) {
+        com.example.ui.components.DeleteConfirmationDialog(
+            title = "Delete Course",
+            message = "Are you sure you want to remove '${courseToDelete!!.name}' (${courseToDelete!!.code}) from your enrolled curriculum?",
+            onConfirm = {
+                viewModel.deleteCourse(courseToDelete!!)
+                courseToDelete = null
+            },
+            onDismiss = { courseToDelete = null }
+        )
+    }
+
+    if (taskToDelete != null) {
+        com.example.ui.components.DeleteConfirmationDialog(
+            title = "Delete Assignment / Task",
+            message = "Are you sure you want to remove assignment '${taskToDelete!!.title}'?",
+            onConfirm = {
+                viewModel.deleteTask(taskToDelete!!)
+                taskToDelete = null
+            },
+            onDismiss = { taskToDelete = null }
         )
     }
 }
@@ -955,6 +998,7 @@ fun CoursesAndAttendanceTab(
     onCourseClick: (CourseEntity) -> Unit,
     onLogAttendance: (Long, String) -> Unit,
     onEditAttendanceClick: (CourseEntity) -> Unit,
+    onEditCourse: (CourseEntity) -> Unit,
     onDeleteCourse: (CourseEntity) -> Unit,
     onAddCourseClick: () -> Unit
 ) {
@@ -1020,11 +1064,20 @@ fun CoursesAndAttendanceTab(
                                 style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                             )
                         }
-                        IconButton(
-                            onClick = { onDeleteCourse(course) },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Course", modifier = Modifier.size(18.dp))
+                        Row {
+                            IconButton(
+                                onClick = { onEditCourse(course) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Course", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            IconButton(
+                                onClick = { onDeleteCourse(course) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Course", modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
 
@@ -1187,6 +1240,7 @@ fun AssignmentsAndExtractionTab(
     courses: List<CourseEntity>,
     onToggleTask: (Long, Boolean) -> Unit,
     onUpdateStatus: (Long, String) -> Unit,
+    onEditTask: (AcademicTaskEntity) -> Unit,
     onDeleteTask: (AcademicTaskEntity) -> Unit,
     onAddTaskClick: () -> Unit,
     onBreakdownClick: () -> Unit,
@@ -1291,11 +1345,20 @@ fun AssignmentsAndExtractionTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(task.courseName, style = MaterialTheme.typography.labelSmall.copy(color = DarkPrimary, fontWeight = FontWeight.Bold))
-                        IconButton(
-                            onClick = { onDeleteTask(task) },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                        Row {
+                            IconButton(
+                                onClick = { onEditTask(task) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Task", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            IconButton(
+                                onClick = { onDeleteTask(task) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
 
@@ -2032,6 +2095,67 @@ fun AddCourseDialog(
 }
 
 @Composable
+fun EditCourseDialog(
+    course: CourseEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (CourseEntity) -> Unit
+) {
+    var code by remember { mutableStateOf(course.code) }
+    var name by remember { mutableStateOf(course.name) }
+    var prof by remember { mutableStateOf(course.professorName) }
+    var contact by remember { mutableStateOf(course.professorContact) }
+    var credits by remember { mutableStateOf(course.credits.toString()) }
+    var classroom by remember { mutableStateOf(course.classroom) }
+    var schedule by remember { mutableStateOf(course.scheduleTime) }
+    var notes by remember { mutableStateOf(course.syllabusSummary) }
+    var target by remember { mutableStateOf(course.attendanceTarget.toString()) }
+    var scheduledClasses by remember { mutableStateOf(course.scheduledClasses.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit University Course", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) },
+        text = {
+            LazyColumn(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { OutlinedTextField(value = code, onValueChange = { code = it }, label = { Text("Course Code (e.g. CS309)") }) }
+                item { OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Course Name") }) }
+                item { OutlinedTextField(value = prof, onValueChange = { prof = it }, label = { Text("Professor Name") }) }
+                item { OutlinedTextField(value = classroom, onValueChange = { classroom = it }, label = { Text("Classroom (e.g. East Campus 4-302)") }) }
+                item { OutlinedTextField(value = credits, onValueChange = { credits = it }, label = { Text("Credits") }) }
+                item { OutlinedTextField(value = schedule, onValueChange = { schedule = it }, label = { Text("Schedule (e.g. Mon 08:00–09:35)") }) }
+                item { OutlinedTextField(value = target, onValueChange = { target = it }, label = { Text("Attendance Target (%)") }) }
+                item { OutlinedTextField(value = scheduledClasses, onValueChange = { scheduledClasses = it }, label = { Text("Total Scheduled Classes in Semester") }) }
+                item { OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Course Notes / Syllabus Summary") }) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (code.isNotBlank() && name.isNotBlank()) {
+                        onConfirm(
+                            course.copy(
+                                code = code,
+                                name = name,
+                                professorName = prof,
+                                professorContact = contact,
+                                credits = credits.toIntOrNull() ?: course.credits,
+                                classroom = classroom,
+                                scheduleTime = schedule,
+                                syllabusSummary = notes,
+                                attendanceTarget = target.toFloatOrNull() ?: course.attendanceTarget,
+                                scheduledClasses = scheduledClasses.toIntOrNull() ?: course.scheduledClasses
+                            )
+                        )
+                    }
+                }
+            ) { Text("Save Changes") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
 fun CourseDetailDialog(
     course: CourseEntity,
     tasks: List<AcademicTaskEntity>,
@@ -2657,6 +2781,61 @@ fun AddTaskDialog(
                     }
                 }
             ) { Text("Save Task") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun EditTaskDialog(
+    task: AcademicTaskEntity,
+    courses: List<CourseEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (AcademicTaskEntity) -> Unit
+) {
+    var title by remember { mutableStateOf(task.title) }
+    var courseName by remember { mutableStateOf(task.courseName) }
+    var type by remember { mutableStateOf(task.type) }
+    var deadline by remember { mutableStateOf(task.deadline) }
+    var hours by remember { mutableStateOf(task.estimatedHours.toString()) }
+    var desc by remember { mutableStateOf(task.description) }
+    var status by remember { mutableStateOf(task.status) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Academic Deliverable") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Task Title") })
+                OutlinedTextField(value = courseName, onValueChange = { courseName = it }, label = { Text("Course Name") })
+                OutlinedTextField(value = type, onValueChange = { type = it }, label = { Text("Type (Assignment, Exam, Project)") })
+                OutlinedTextField(value = deadline, onValueChange = { deadline = it }, label = { Text("Deadline") })
+                OutlinedTextField(value = hours, onValueChange = { hours = it }, label = { Text("Estimated Hours") })
+                OutlinedTextField(value = status, onValueChange = { status = it }, label = { Text("Status (Not Started, In Progress, Completed)") })
+                OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Requirements / Description") })
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(
+                            task.copy(
+                                courseName = courseName,
+                                title = title,
+                                type = type,
+                                deadline = deadline,
+                                description = desc,
+                                status = status,
+                                estimatedHours = hours.toFloatOrNull() ?: task.estimatedHours,
+                                isCompleted = status.equals("Completed", ignoreCase = true)
+                            )
+                        )
+                    }
+                }
+            ) { Text("Save Changes") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

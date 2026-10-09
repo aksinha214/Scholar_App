@@ -72,6 +72,7 @@ data class ExtractedAction(
 object DocumentIntelligenceEngine {
 
     fun generateStructuredSummary(doc: PersonalDocumentEntity): StructuredDocumentSummary {
+        val isBinary = doc.isBinaryUnsupported || doc.content.isBlank() || doc.content.startsWith("[Binary")
         val lower = (doc.content + " " + doc.fileName + " " + doc.tags).lowercase()
         val isResearch = doc.category.equals("RESEARCH", ignoreCase = true) ||
                 lower.contains("abstract") || lower.contains("methodology") || lower.contains("cvpr")
@@ -84,87 +85,83 @@ object DocumentIntelligenceEngine {
         val concepts = mutableListOf<String>()
         val questions = mutableListOf<String>()
 
-        // Date extraction
-        if (lower.contains("october 18") || lower.contains("10月18") || lower.contains("oct 18")) dates.add("October 18: Midterm literature report")
-        if (lower.contains("october 12") || lower.contains("10月12") || lower.contains("oct 12")) dates.add("October 12: Lab assignment 1 submission")
-        if (lower.contains("december 18") || lower.contains("12月18") || lower.contains("dec 18")) dates.add("December 18: Final graduation project defense")
-        if (lower.contains("nov 15") || lower.contains("november 15")) dates.add("November 15: Conference abstract registration deadline")
-        if (lower.contains("nov 22") || lower.contains("november 22")) dates.add("November 22: Full paper submission cutoff")
-        if (lower.contains("24 hours") || lower.contains("24小时")) dates.add("Within 24 hours of arrival: Mandatory local police accommodation registration")
-        if (lower.contains("30 days") || lower.contains("30天")) dates.add("30 days prior: Residence permit renewal submission to ISO")
-
-        // People & Orgs
-        if (lower.contains("zhang lin") || lower.contains("张琳")) peopleOrgs.add("Prof. Zhang Lin (Advisor, AI Center)")
-        if (lower.contains("chen gang") || lower.contains("陈刚")) peopleOrgs.add("Prof. Chen Gang (OS Lab)")
-        if (lower.contains("yanshan university") || lower.contains("ysu") || lower.contains("燕山大学")) peopleOrgs.add("Yanshan University (School of Information Science)")
-        if (lower.contains("iso") || lower.contains("留学生办公室")) peopleOrgs.add("YSU International Students Office (ISO)")
-        if (lower.contains("ministry of human resources") || lower.contains("nia")) peopleOrgs.add("National Immigration Administration / Ministry of Human Resources")
-
-        // Technical Concepts
-        if (lower.contains("point cloud") || lower.contains("点云")) concepts.add("3D Point Cloud Semantic Segmentation")
-        if (lower.contains("lidar") || lower.contains("radar")) concepts.add("LiDAR Sensor Scattering & Koschmieder Law")
-        if (lower.contains("transformer") || lower.contains("vit")) concepts.add("Vision Transformers & Deformable Cross-Attention")
-        if (lower.contains("copy-on-write") || lower.contains("cow") || lower.contains("xv6")) concepts.add("Operating System Kernel Paging & Lazy Allocation")
-        if (lower.contains("work permit") || lower.contains("category b")) concepts.add("Foreigner's Work Permit Classification & Points System")
-
-        // Requirements & Actions
-        if (lower.contains("plagiarism") || lower.contains("academic integrity")) requirements.add("All code and manuscript writing must follow strict academic integrity standards.")
-        if (lower.contains("pytorch") || lower.contains("labs")) requirements.add("Complete hands-on programming implementations without unauthorized black-box libraries.")
-        if (lower.contains("police") || lower.contains("派出所")) actions.add("Submit accommodation registration at the local police station.")
-        if (lower.contains("defense") || lower.contains("答辩")) actions.add("Rehearse 10-minute thesis oral presentation in bilingual Chinese/English.")
-
-        // Questions to answer
-        questions.add("Are all empirical baseline comparisons (PointNeXt, SphereFormer) rigorously benchmarked?")
-        questions.add("Does this document have an upcoming deadline that requires entry into your task planner?")
-
-        val topic = if (doc.userNotes.isNotBlank()) doc.userNotes
-        else "Document regarding '${doc.fileName}' associated with ${if (doc.courseOrProject.isNotBlank()) doc.courseOrProject else doc.category}."
-
-        return if (isResearch) {
-            StructuredDocumentSummary(
+        if (isBinary) {
+            keyPoints.add("Binary document file (${doc.fileType}) stored in library.")
+            keyPoints.add("Full text parsing is unavailable locally on-device. Metadata, course association, and notes are indexed.")
+            if (doc.courseOrProject.isNotBlank()) keyPoints.add("Associated with: ${doc.courseOrProject}")
+            if (doc.tags.isNotBlank()) keyPoints.add("Indexed tags: ${doc.tags}")
+            if (doc.userNotes.isNotBlank()) keyPoints.add("Personal notes: ${doc.userNotes}")
+            return StructuredDocumentSummary(
                 title = doc.fileName,
                 category = doc.category,
-                mainTopic = topic,
-                keyPoints = listOf(
-                    "Focuses on 3D LiDAR point cloud semantic segmentation under adverse maritime coastal fog.",
-                    "Proposes PointFog-SAM combining 3D sparse voxels with 2D visual foundation model representations.",
-                    "Demonstrates +8.4% mIoU improvement over SOTA PointNeXt baseline on Qinhuangdao Port dataset.",
-                    "Real-time edge performance verified at 38 FPS on NVIDIA Jetson AGX Orin."
-                ),
-                importantDates = dates,
-                requirements = listOf("Requires double-blind format (8 pages + references) and open-source reproducibility code repository."),
-                importantPeopleOrgs = peopleOrgs,
-                actionItems = listOf("Finalize 4-row ablation table matrix before submission cutoff.", "Package Docker container with random seed configuration."),
-                technicalConcepts = concepts,
-                questionsToAnswer = listOf("How does the model perform under non-fog adverse weather (e.g. heavy rain)?", "Can INT8 quantization preserve the +8.4% mIoU edge?"),
-                isResearchPaper = true,
-                researchProblem = "Severe point cloud backscatter attenuation in dense maritime fog causing existing SOTA LiDAR perception models to drop >32% mIoU.",
-                methodology = "Dual-stream feature extraction with depth-dependent scattering compensation and cross-attention temporal consistency regularization.",
-                dataset = "Qinhuangdao Port LiDAR Maritime Dataset (12,000 coastal scans) + SemanticKITTI.",
-                models = "PointFog-SAM (evaluating against PointNeXt, SphereFormer, Cylinder3D, MinkUNet).",
-                evaluationMetrics = "mIoU (mean Intersection over Union), Accuracy, Precision/Recall, Inference FPS on embedded Jetson Orin.",
-                mainFindings = "Achieves 64.8% mIoU under simulated fog and 58.4% mIoU on real Qinhuangdao port fog, beating PointNeXt by +8.4% to +10.3%.",
-                limitations = "Requires calibrated LiDAR beam intensity calibration for novel sensor optical wavelengths.",
-                relevanceToScholar = "Directly forms your primary undergraduate thesis contribution and CVPR 2027 conference paper submission."
-            )
-        } else {
-            StructuredDocumentSummary(
-                title = doc.fileName,
-                category = doc.category,
-                mainTopic = topic,
-                keyPoints = listOf(
-                    "Contains official policies, lecture notes, or syllabus guidelines for ${doc.category}.",
-                    "Directly impacts your academic standing and graduation trajectory at Yanshan University."
-                ),
-                importantDates = dates,
-                requirements = requirements,
-                importantPeopleOrgs = peopleOrgs,
-                actionItems = actions,
-                technicalConcepts = concepts,
-                questionsToAnswer = questions,
-                isResearchPaper = false
+                mainTopic = if (doc.userNotes.isNotBlank()) doc.userNotes else "Binary ${doc.fileType} Document: ${doc.fileName}",
+                keyPoints = keyPoints,
+                importantDates = if (doc.userNotes.contains("202")) listOf("Note date: ${doc.uploadDate}") else emptyList(),
+                requirements = emptyList(),
+                importantPeopleOrgs = if (doc.courseOrProject.isNotBlank()) listOf(doc.courseOrProject) else emptyList(),
+                actionItems = listOf("Open file using system viewer to view full contents."),
+                technicalConcepts = if (doc.tags.isNotBlank()) doc.tags.split(",", " ").filter { it.isNotBlank() } else emptyList(),
+                questionsToAnswer = listOf("Can external text be extracted or summarized into notes?"),
+                isResearchPaper = isResearch
             )
         }
+
+        // For documents with extracted text: extract real lines & metrics
+        val lines = doc.content.lines().filter { it.isNotBlank() }
+        val sampleLines = lines.take(5)
+        keyPoints.addAll(sampleLines.map { it.take(120) })
+        if (keyPoints.isEmpty()) {
+            keyPoints.add("Extracted text length: ${doc.content.length} characters across ${lines.size} lines.")
+        }
+
+        // Date extraction
+        val dateRegex = Regex("""\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4}-\d{2}-\d{2})\b""", RegexOption.IGNORE_CASE)
+        lines.filter { it.contains(dateRegex) }.take(5).forEach {
+            dates.add(it.trim().take(90))
+        }
+
+        // Requirements & actions from text
+        lines.filter { line ->
+            val l = line.lowercase()
+            l.contains("require") || l.contains("must") || l.contains("should") || l.contains("deadline") || l.contains("due")
+        }.take(4).forEach {
+            requirements.add(it.trim().take(100))
+        }
+
+        val topic = if (doc.userNotes.isNotBlank()) doc.userNotes
+        else lines.firstOrNull()?.take(100) ?: "Extracted Document: '${doc.fileName}'"
+
+        val researchProblem = if (isResearch) {
+            lines.find { it.contains("problem", ignoreCase = true) || it.contains("attenuation", ignoreCase = true) || it.contains("abstract", ignoreCase = true) }
+                ?: "Investigation of technical problem articulated in document."
+        } else null
+
+        val methodology = if (isResearch) {
+            lines.find { it.contains("method", ignoreCase = true) || it.contains("introduce", ignoreCase = true) || it.contains("scattering", ignoreCase = true) || it.contains("model", ignoreCase = true) }
+                ?: "Proposed methodological architecture and implementation."
+        } else null
+
+        val evaluationMetrics = if (isResearch) {
+            lines.find { it.contains("evaluat", ignoreCase = true) || it.contains("metric", ignoreCase = true) || it.contains("dataset", ignoreCase = true) || it.contains("miou", ignoreCase = true) }
+                ?: "Evaluated on custom experimental benchmarks (mIoU / accuracy / latency)."
+        } else null
+
+        return StructuredDocumentSummary(
+            title = doc.fileName,
+            category = doc.category,
+            mainTopic = topic,
+            keyPoints = keyPoints,
+            importantDates = dates,
+            requirements = requirements,
+            importantPeopleOrgs = peopleOrgs,
+            actionItems = actions,
+            technicalConcepts = concepts,
+            questionsToAnswer = questions,
+            isResearchPaper = isResearch,
+            researchProblem = researchProblem,
+            methodology = methodology,
+            evaluationMetrics = evaluationMetrics
+        )
     }
 
     fun askMyDocuments(
@@ -185,53 +182,42 @@ object DocumentIntelligenceEngine {
         }
 
         if (matchingDocs.isNotEmpty()) {
-            docFindings.appendLine("Information retrieved directly from your personal knowledge base:")
+            docFindings.appendLine("Information retrieved from your document library:")
             docFindings.appendLine()
 
-            matchingDocs.take(3).forEach { doc ->
-                // Extract matching snippet
-                val snippet = extractRelevantSnippet(doc.content, q)
-                docFindings.appendLine("• From '${doc.fileName}' (${doc.category}):")
-                docFindings.appendLine("  \"$snippet\"")
-                docFindings.appendLine()
+            matchingDocs.take(4).forEach { doc ->
+                val isBinary = doc.isBinaryUnsupported || doc.content.isBlank() || doc.content.startsWith("[Binary")
+                if (isBinary) {
+                    val excerpt = "File '${doc.fileName}' (${doc.fileType}): [Binary document - full text unextracted]. Metadata match: Tags='${doc.tags}', Course='${doc.courseOrProject}', Notes='${doc.userNotes}'"
+                    docFindings.appendLine("• Metadata Match from '${doc.fileName}' (${doc.category}):")
+                    docFindings.appendLine("  $excerpt")
+                    docFindings.appendLine()
 
-                citations.add(
-                    CitedDocumentSource(
-                        documentTitle = doc.fileName,
-                        category = doc.category,
-                        relevantExcerpt = snippet
+                    citations.add(
+                        CitedDocumentSource(
+                            documentTitle = doc.fileName,
+                            category = "${doc.category} (Metadata Only)",
+                            relevantExcerpt = excerpt
+                        )
                     )
-                )
-            }
+                } else {
+                    val snippet = extractRelevantSnippet(doc.content, q)
+                    docFindings.appendLine("• Extracted Text from '${doc.fileName}' (${doc.category}):")
+                    docFindings.appendLine("  \"$snippet\"")
+                    docFindings.appendLine()
 
-            // Synthesize answer based on query
-            when {
-                q.contains("deadline") || q.contains("due") || q.contains("date") -> {
-                    docFindings.appendLine("Key Deadlines Found in Your Documents:")
-                    matchingDocs.forEach { doc ->
-                        if (doc.content.contains("October 18", ignoreCase = true)) docFindings.appendLine("  - Oct 18: Midterm Literature Report (${doc.fileName})")
-                        if (doc.content.contains("December 18", ignoreCase = true)) docFindings.appendLine("  - Dec 18: Final Project Defense (${doc.fileName})")
-                        if (doc.content.contains("October 12", ignoreCase = true)) docFindings.appendLine("  - Oct 12: Lab Assignment 1 (${doc.fileName})")
-                        if (doc.content.contains("Nov 15", ignoreCase = true)) docFindings.appendLine("  - Nov 15: Conference Abstract Registration (${doc.fileName})")
-                        if (doc.content.contains("Nov 22", ignoreCase = true)) docFindings.appendLine("  - Nov 22: Full Paper Submission (${doc.fileName})")
-                    }
-                }
-                q.contains("methodology") || q.contains("method") -> {
-                    docFindings.appendLine("Methodology Extracted from Your Research Documents:")
-                    docFindings.appendLine("  - Physics-based Koschmieder scattering inversion layer for depth-dependent light attenuation.")
-                    docFindings.appendLine("  - Deformable cross-attention module fusing 3D sparse voxels with 2D SAM visual representations.")
-                    docFindings.appendLine("  - Spatio-temporal consistency regularization over consecutive LiDAR sweeps.")
-                }
-                q.contains("requirement") || q.contains("rule") -> {
-                    docFindings.appendLine("Requirements Extracted from Your Course Documents:")
-                    docFindings.appendLine("  - Independent PyTorch code implementation; verified commit logs.")
-                    docFindings.appendLine("  - Plagiarism index strictly below 15%.")
-                    docFindings.appendLine("  - 10-minute thesis oral defense delivered in bilingual Chinese/English.")
+                    citations.add(
+                        CitedDocumentSource(
+                            documentTitle = doc.fileName,
+                            category = "${doc.category} (Indexed Text)",
+                            relevantExcerpt = snippet
+                        )
+                    )
                 }
             }
         } else {
-            docFindings.appendLine("No specific mention of '${query}' was found in your uploaded documents.")
-            docFindings.appendLine("I am not inventing any document contents.")
+            docFindings.appendLine("No specific mention of '${query}' was found in your uploaded documents or metadata.")
+            docFindings.appendLine("Full text was searched in indexed documents; binary documents checked by metadata.")
         }
 
         // 2. Add General Knowledge / Context (Clearly partitioned)

@@ -114,6 +114,211 @@ object ChineseCoachEngine {
         )
     }
 
+    data class HskQuizQuestion(
+        val level: String,
+        val questionPrompt: String,
+        val options: List<String>,
+        val correctIndex: Int,
+        val explanation: String
+    )
+
+    fun getHskQuizzes(level: String): List<HskQuizQuestion> {
+        return when (level.uppercase()) {
+            "HSK 1", "LEVEL 1" -> listOf(
+                HskQuizQuestion("HSK 1", "What does '谢谢' (xièxie) mean?", listOf("Hello", "Thank you", "Goodbye", "Sorry"), 1, "谢谢 (xièxie) is the standard Chinese expression for 'Thank you'."),
+                HskQuizQuestion("HSK 1", "Which character means 'water'?", listOf("火", "水", "日", "月"), 1, "水 (shuǐ) means water, composed of the water radical."),
+                HskQuizQuestion("HSK 1", "What is the pinyin for '学校' (school)?", listOf("xuéxiào", "lǎoshī", "fànguǎn", "shāngdiàn"), 0, "学校 is pronounced 'xuéxiào'."),
+                HskQuizQuestion("HSK 1", "Translate: '我是学生。' (Wǒ shì xuésheng.)", listOf("I am a teacher.", "I am a student.", "I am a doctor.", "I like China."), 1, "我是学生 translates to 'I am a student.'"),
+                HskQuizQuestion("HSK 1", "Which word means 'today'?", listOf("明天 (míngtiān)", "昨天 (zuótiān)", "今天 (jīntiān)", "现在 (xiànzài)"), 2, "今天 (jīntiān) means today.")
+            )
+            "HSK 2", "LEVEL 2" -> listOf(
+                HskQuizQuestion("HSK 2", "What does '准备' (zhǔnbèi) mean?", listOf("To begin", "To prepare", "To introduce", "To rest"), 1, "准备 (zhǔnbèi) means to prepare or get ready."),
+                HskQuizQuestion("HSK 2", "Which word means 'hospital' or 'illness' context?", listOf("生病 (shēngbìng)", "跑步 (pǎobù)", "公共汽车 (gōnggòng qìchē)", "便宜 (piányi)"), 0, "生病 (shēngbìng) means to get sick or fall ill."),
+                HskQuizQuestion("HSK 2", "Fill in blank: '今天的天气___昨天冷。' (Comparison)", listOf("有 (yǒu)", "比 (bǐ)", "在 (zài)", "从 (cóng)"), 1, "比 (bǐ) is the comparative marker: A 比 B + Adjective."),
+                HskQuizQuestion("HSK 2", "What is the opposite of '贵' (guì - expensive)?", listOf("快 (kuài)", "近 (jìn)", "便宜 (piányi)", "容易 (róngyì)"), 2, "便宜 (piányi) means inexpensive or cheap."),
+                HskQuizQuestion("HSK 2", "Translate: '我们可以坐公共汽车去火车站。'", listOf("We can take a bus to the train station.", "We are walking to the airport.", "The taxi is very expensive.", "The train station is nearby."), 0, "公共汽车 = bus, 火车站 = railway station, 坐 = to ride.")
+            )
+            "HSK 3", "LEVEL 3" -> listOf(
+                HskQuizQuestion("HSK 3", "What does '实验室' (shíyànshì) mean in academic context?", listOf("Library", "Laboratory", "Dormitory", "Classroom"), 1, "实验室 (shíyànshì) is a university laboratory or research lab."),
+                HskQuizQuestion("HSK 3", "Which verb means 'to resolve / solve a problem'?", listOf("完成 (wánchéng)", "练习 (liànxí)", "解决 (jiějué)", "提高 (tígāo)"), 2, "解决 (jiějué) means to resolve or solve (e.g. 解决问题)."),
+                HskQuizQuestion("HSK 3", "Translate: '请同学们按时完成作业。'", listOf("Please hand in books tomorrow.", "Please complete assignments on time.", "Please come to lab for meeting.", "Please apply for residence permit."), 1, "按时 = on time, 完成 = complete, 作业 = homework/assignment."),
+                HskQuizQuestion("HSK 3", "What is '校园卡' (xiàoyuánkǎ)?", listOf("Campus Smart Card", "Bus ticket", "Student visa", "Credit card"), 0, "校园卡 is the campus all-in-one smart card used at Chinese universities."),
+                HskQuizQuestion("HSK 3", "Which structure is used for 'disposal' of an object?", listOf("把 (bǎ) 字句", "被 (bèi) 字句", "比 (bǐ) 字句", "连 (lián) 字句"), 0, "把 (bǎ) is the disposal structure indicating action done to an object.")
+            )
+            else -> emptyList()
+        }
+    }
+
+    fun getCuratedHskVocabulary(userEmail: String): List<ChineseVocabularyEntity> {
+        val list = mutableListOf<ChineseVocabularyEntity>()
+
+        // HSK 1 (Foundations & Daily Survival)
+        val hsk1Words = listOf(
+            Triple("你好", "nǐ hǎo", "Hello / Greetings") to ("你好！我是燕山大学的学生。" to "Hello! I am a student at Yanshan University."),
+            Triple("谢谢", "xièxie", "Thank you") to ("谢谢老师的帮助。" to "Thank you for the teacher's help."),
+            Triple("不客气", "bú kèqi", "You're welcome") to ("不客气，这是我应该做的。" to "You are welcome, this is what I should do."),
+            Triple("再见", "zàijiàn", "Goodbye") to ("明天见，再见！" to "See you tomorrow, goodbye!"),
+            Triple("请", "qǐng", "Please / To invite") to ("请进，请坐。" to "Please come in, please sit down."),
+            Triple("是", "shì", "To be (is / am / are)") to ("我是计算机科学专业的国际学生。" to "I am an international student majoring in CS."),
+            Triple("不", "bù", "No / Not") to ("我不是新生，我是大三学生。" to "I am not a freshman, I am a junior student."),
+            Triple("有", "yǒu", "To have / There is") to ("今天下午有一节操作系统课。" to "There is an Operating Systems class this afternoon."),
+            Triple("没有", "méiyǒu", "Do not have") to ("我今天没有实验课。" to "I don't have lab class today."),
+            Triple("水", "shuǐ", "Water") to ("请给我一杯水。" to "Please give me a cup of water."),
+            Triple("今天", "jīntiān", "Today") to ("今天星期一，我要去图书馆。" to "Today is Monday, I am going to the library."),
+            Triple("明天", "míngtiān", "Tomorrow") to ("明天上午有编程作业要交。" to "Tomorrow morning there is a programming assignment due."),
+            Triple("昨天", "zuótiān", "Yesterday") to ("昨天我在宿舍写代码。" to "Yesterday I wrote code in the dormitory."),
+            Triple("老师", "lǎoshī", "Teacher / Professor") to ("张老师是我的学术导师。" to "Professor Zhang is my academic advisor."),
+            Triple("学生", "xuésheng", "Student") to ("燕山大学有很多国际学生。" to "Yanshan University has many international students."),
+            Triple("学校", "xuéxiào", "School / University") to ("我们的学校在河北省秦皇岛市。" to "Our university is in Qinhuangdao, Hebei Province."),
+            Triple("做", "zuò", "To do / To make") to ("你在做什么项目？" to "What project are you working on?"),
+            Triple("看", "kàn", "To look / To read / To watch") to ("我看了一篇计算机视觉论文。" to "I read a computer vision paper."),
+            Triple("听", "tīng", "To listen") to ("请认真听老师讲课。" to "Please listen carefully to the professor's lecture."),
+            Triple("说", "shuō", "To speak / To say") to ("请用中文说一遍。" to "Please say it once in Chinese."),
+            Triple("买", "mǎi", "To buy") to ("我要买一本算法书。" to "I want to buy an algorithms book."),
+            Triple("喜欢", "xǐhuan", "To like") to ("我很喜欢深度学习研究。" to "I really like deep learning research."),
+            Triple("高兴", "gāoxìng", "Happy / Pleased") to ("很高兴认识大家。" to "Very glad to meet everyone.")
+        )
+
+        hsk1Words.forEachIndexed { idx, (info, sentences) ->
+            val status = when {
+                idx < 10 -> "Mastered"
+                idx < 16 -> "Learning"
+                idx < 20 -> "Review"
+                else -> "New"
+            }
+            list.add(
+                ChineseVocabularyEntity(
+                    userEmail = userEmail,
+                    hanzi = info.first,
+                    pinyin = info.second,
+                    english = info.third,
+                    partOfSpeech = "Basic Core",
+                    exampleSentenceZh = sentences.first,
+                    exampleSentenceEn = sentences.second,
+                    userNotes = "HSK 1 Core Vocabulary",
+                    difficulty = "Easy",
+                    hskLevel = "HSK 1",
+                    category = "HSK 1 Foundations",
+                    source = "Curated HSK Syllabus",
+                    isFavorite = idx < 5,
+                    isKnown = status == "Mastered" || status == "Learning",
+                    reviewStatus = status,
+                    reviewCount = if (status == "Mastered") 4 else if (status == "Learning") 2 else 0,
+                    correctAnswers = if (status == "Mastered") 4 else 1,
+                    incorrectAnswers = if (status == "Review") 1 else 0,
+                    intervalDays = if (status == "Mastered") 21 else 3,
+                    nextReviewDate = if (status == "Review") "2026-10-07" else "2026-10-25"
+                )
+            )
+        }
+
+        // HSK 2 (Routine & Campus Navigation)
+        val hsk2Words = listOf(
+            Triple("准备", "zhǔnbèi", "To prepare / Preparation") to ("我正在准备期末考试和实验报告。" to "I am preparing for final exams and lab reports."),
+            Triple("开始", "kāishǐ", "To begin / Start") to ("组会早上九点正式开始。" to "The group meeting officially begins at 9:00 AM."),
+            Triple("帮助", "bāngzhù", "To help / Assistance") to ("感谢学长在Linux配置上的帮助。" to "Thanks to senior for help with Linux setup."),
+            Triple("介绍", "jièshào", "To introduce") to ("请介绍一下你的研究方向。" to "Please introduce your research area."),
+            Triple("懂", "dǒng", "To understand") to ("这道算法题你听懂了吗？" to "Did you understand this algorithm problem?"),
+            Triple("告诉", "gàosu", "To tell / Inform") to ("请告诉我实验室的Wi-Fi密码。" to "Please tell me the lab's Wi-Fi password."),
+            Triple("可以", "kěyǐ", "Can / May") to ("请问我可以借用这台服务器吗？" to "Excuse me, may I borrow this GPU server?"),
+            Triple("容易", "róngyì", "Easy / Simple") to ("Python编程入门相对容易。" to "Getting started with Python programming is relatively easy."),
+            Triple("累", "lèi", "Tired") to ("今天跑了一整天实验，有点累。" to "Ran experiments all day today, feeling a bit tired."),
+            Triple("教室", "jiàoshì", "Classroom") to ("第四教学楼302教室在上课。" to "Class is underway in Classroom 302, Building 4."),
+            Triple("公共汽车", "gōnggòng qìchē", "Bus") to ("我们可以坐6路公共汽车去燕大东区。" to "We can take Bus 6 to YSU East Campus."),
+            Triple("火车站", "huǒchēzhàn", "Railway Station") to ("从秦皇岛火车站坐出租车大约二十分钟。" to "It takes about 20 minutes by taxi from Qinhuangdao Station."),
+            Triple("便宜", "piányi", "Inexpensive / Cheap") to ("大学食堂的饭菜既好吃又便宜。" to "University canteen meals are both delicious and cheap."),
+            Triple("考试", "kǎoshì", "Exam / Test") to ("下周三有离散数学期中考试。" to "Discrete math midterm exam is next Wednesday."),
+            Triple("时间", "shíjiān", "Time") to ("请合理安排科研与自习时间。" to "Please arrange research and self-study time reasonably.")
+        )
+
+        hsk2Words.forEachIndexed { idx, (info, sentences) ->
+            val status = when {
+                idx < 5 -> "Mastered"
+                idx < 10 -> "Learning"
+                idx < 13 -> "Review"
+                else -> "New"
+            }
+            list.add(
+                ChineseVocabularyEntity(
+                    userEmail = userEmail,
+                    hanzi = info.first,
+                    pinyin = info.second,
+                    english = info.third,
+                    partOfSpeech = "Campus & Routine",
+                    exampleSentenceZh = sentences.first,
+                    exampleSentenceEn = sentences.second,
+                    userNotes = "HSK 2 Core Routine",
+                    difficulty = "Medium",
+                    hskLevel = "HSK 2",
+                    category = "HSK 2 Campus",
+                    source = "Curated HSK Syllabus",
+                    isFavorite = idx % 3 == 0,
+                    isKnown = status == "Mastered" || status == "Learning",
+                    reviewStatus = status,
+                    reviewCount = if (status == "Mastered") 3 else 1,
+                    correctAnswers = if (status == "Mastered") 3 else 1,
+                    incorrectAnswers = if (status == "Review") 2 else 0,
+                    intervalDays = if (status == "Mastered") 14 else 2,
+                    nextReviewDate = if (status == "Review") "2026-10-07" else "2026-10-18"
+                )
+            )
+        }
+
+        // HSK 3 (Study, Academic Life & Admin Fluency)
+        val hsk3Words = listOf(
+            Triple("实验室", "shíyànshì", "Laboratory / Research Lab") to ("我们的计算机视觉实验室在信息馆五楼。" to "Our computer vision lab is on the 5th floor of the IT Building."),
+            Triple("校园卡", "xiàoyuánkǎ", "Campus Smart Card") to ("校园卡不仅可以打饭，还可以进出宿舍门禁。" to "The campus card is used for canteens and dorm access."),
+            Triple("解决", "jiějué", "To solve / Resolve") to ("这个优化算法成功解决了显存占用过高的问题。" to "This optimization algorithm successfully solved high VRAM usage."),
+            Triple("完成", "wánchéng", "To complete / Accomplish") to ("我按时完成了本周的文献调研报告。" to "I completed this week's literature survey report on time."),
+            Triple("提高", "tígāo", "To improve / Enhance") to ("新模型在测试集上提高了8.4%的准确率。" to "The new model improved accuracy by 8.4% on test set."),
+            Triple("练习", "liànxí", "To practice / Exercise") to ("每天坚持做编程练习可以巩固算法基础。" to "Daily coding practice consolidates algorithmic foundations."),
+            Triple("复习", "fùxí", "To review (lessons)") to ("考试周前需要重点复习操作系统的进程调度。" to "Review OS process scheduling before exam week."),
+            Triple("严格", "yángé", "Strict / Rigorous") to ("导师对学术诚信和实验复现性的要求非常严格。" to "Advisor is very strict regarding academic integrity."),
+            Triple("重要", "zhòngyào", "Important / Crucial") to ("数据预处理对三维点云分割非常重要。" to "Data preprocessing is crucial for 3D point cloud segmentation."),
+            Triple("必须", "bìxū", "Must / Have to") to ("居留许可到期前三十天必须申请延期。" to "You must apply for extension 30 days before permit expiry."),
+            Triple("电脑", "diànnǎo", "Computer") to ("这台深度学习工作站配备了两块高性能显卡。" to "This workstation is equipped with dual GPUs."),
+            Triple("申请", "shēnqǐng", "To apply / Application") to ("我正在向出入境管理局申请新的居留许可。" to "I am applying for a new residence permit at Exit-Entry Bureau."),
+            Triple("答辩", "dábiàn", "Thesis Defense") to ("毕业答辩需要用中英双语准备PPT演示。" to "Thesis defense requires preparing bilingual slides."),
+            Triple("护照", "hùzhào", "Passport") to ("去银行开户和出入境登记都需要携带护照原件。" to "Bring original passport to open bank account and register."),
+            Triple("图书馆", "túshūguǎn", "Library") to ("燕山大学图书馆有丰富的计算机中英文藏书。" to "YSU library has rich Chinese and English CS book collections.")
+        )
+
+        hsk3Words.forEachIndexed { idx, (info, sentences) ->
+            val status = when {
+                idx < 4 -> "Mastered"
+                idx < 9 -> "Learning"
+                idx < 13 -> "Review"
+                else -> "New"
+            }
+            list.add(
+                ChineseVocabularyEntity(
+                    userEmail = userEmail,
+                    hanzi = info.first,
+                    pinyin = info.second,
+                    english = info.third,
+                    partOfSpeech = "Academic & Fluency",
+                    exampleSentenceZh = sentences.first,
+                    exampleSentenceEn = sentences.second,
+                    userNotes = "HSK 3 Academic & Campus Survival",
+                    difficulty = "Medium",
+                    hskLevel = "HSK 3",
+                    category = "HSK 3 Academic",
+                    source = "Curated HSK Syllabus",
+                    isFavorite = true,
+                    isKnown = status == "Mastered" || status == "Learning",
+                    reviewStatus = status,
+                    reviewCount = if (status == "Mastered") 3 else 1,
+                    correctAnswers = if (status == "Mastered") 3 else 1,
+                    incorrectAnswers = if (status == "Review") 2 else 0,
+                    intervalDays = if (status == "Mastered") 10 else 1,
+                    nextReviewDate = if (status == "Review") "2026-10-07" else "2026-10-15"
+                )
+            )
+        }
+
+        return list
+    }
+
     // ========================================================
     // 2. DAILY STUDY PLAN GENERATOR
     // ========================================================

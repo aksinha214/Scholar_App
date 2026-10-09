@@ -279,6 +279,9 @@ interface SkillDao {
     @Update
     suspend fun updateSkill(skill: SkillItemEntity)
 
+    @Delete
+    suspend fun deleteSkill(skill: SkillItemEntity)
+
     @Query("UPDATE cs_skills SET isCompleted = :completed WHERE id = :id")
     suspend fun toggleSkill(id: Long, completed: Boolean)
 }

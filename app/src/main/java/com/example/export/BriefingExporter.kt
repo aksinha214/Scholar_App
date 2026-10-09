@@ -218,7 +218,7 @@ object BriefingExporter {
             canvas.drawText("CS SCHOLAR OS — TODAY'S BRIEFING", startX, y, titlePaint)
             y += 18f
 
-            val scholar = scholarContext.userProfile?.name ?: "Alexei Chen"
+            val scholar = scholarContext.userProfile?.name ?: "International Scholar"
             val univ = scholarContext.universityProfile?.university ?: "Yanshan University"
             canvas.drawText("${briefing.dateSummary} • Scholar: $scholar ($univ)", startX, y, subtitlePaint)
             y += 16f

@@ -7,6 +7,8 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ai.*
+import com.example.data.auth.ScholarAccount
+import com.example.data.auth.ScholarAuthManager
 import com.example.export.*
 import com.example.voice.*
 import com.example.data.db.AppDatabase
@@ -38,14 +40,18 @@ enum class AppScreen(val id: String, val title: String, val iconName: String) {
 class ScholarViewModel(application: Application) : AndroidViewModel(application), TextToSpeech.OnInitListener {
     private val db = AppDatabase.getInstance(application)
     val repository = ScholarRepository(db)
+    val authManager = ScholarAuthManager(application)
     private val prefs = application.getSharedPreferences("cs_scholar_session", Context.MODE_PRIVATE)
 
     // Authentication Session State
-    private val _isAuthenticated = MutableStateFlow(prefs.getBoolean("is_authenticated", true))
+    private val _isAuthenticated = MutableStateFlow(prefs.getBoolean("is_authenticated", false))
     val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
 
-    private val _currentUserEmail = MutableStateFlow(prefs.getString("user_email", "alexei.chen@ysu.edu.cn") ?: "alexei.chen@ysu.edu.cn")
+    private val _currentUserEmail = MutableStateFlow(prefs.getString("user_email", "") ?: "")
     val currentUserEmail: StateFlow<String> = _currentUserEmail.asStateFlow()
+
+    private val _currentStudentId = MutableStateFlow(prefs.getString("student_id", "") ?: "")
+    val currentStudentId: StateFlow<String> = _currentStudentId.asStateFlow()
 
     // Text to Speech
     private var tts: TextToSpeech? = null
@@ -60,11 +66,19 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
             tts = TextToSpeech(application, this)
         } catch (_: Exception) {}
 
-        // Ensure database is populated with seed data on first boot or if empty
+        // Ensure database is populated with seed data on first boot or restore current authenticated user's profile
         viewModelScope.launch(Dispatchers.IO) {
-            val existing = repository.getUserProfileOnce()
-            if (existing == null) {
-                InitialDataPopulator.populate(db)
+            val savedEmail = prefs.getString("user_email", null)
+            if (savedEmail != null) {
+                val account = authManager.getAccount(savedEmail)
+                if (account != null) {
+                    repository.updateProfile(account.profile)
+                }
+            } else {
+                val existing = repository.getUserProfileOnce()
+                if (existing == null) {
+                    InitialDataPopulator.populate(db)
+                }
             }
         }
     }
@@ -87,27 +101,103 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
         _toastEvent.value = null
     }
 
-    fun login(email: String, studentId: String) {
-        val userEmail = if (email.isNotBlank()) email else "alexei.chen@ysu.edu.cn"
-        prefs.edit()
-            .putBoolean("is_authenticated", true)
-            .putString("user_email", userEmail)
-            .putString("student_id", studentId)
-            .apply()
+    fun signIn(emailOrId: String, password: String): Result<ScholarAccount> {
+        val result = authManager.signIn(emailOrId, password)
+        if (result.isSuccess) {
+            val account = result.getOrThrow()
+            prefs.edit()
+                .putBoolean("is_authenticated", true)
+                .putString("user_email", account.email)
+                .putString("student_id", account.studentId)
+                .putString("user_name", account.fullName)
+                .apply()
 
-        _currentUserEmail.value = userEmail
-        _isAuthenticated.value = true
-        _currentScreen.value = AppScreen.DASHBOARD
-        _toastEvent.value = "Welcome back, Scholar!"
+            _currentUserEmail.value = account.email
+            _currentStudentId.value = account.studentId
+            _isAuthenticated.value = true
+            _currentScreen.value = AppScreen.DASHBOARD
+
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.updateProfile(account.profile)
+            }
+            _toastEvent.value = "Welcome back, ${account.fullName}!"
+        }
+        return result
+    }
+
+    fun signUp(
+        name: String,
+        email: String,
+        studentId: String,
+        password: String,
+        confirmPassword: String,
+        university: String = "Yanshan University (燕山大学)",
+        department: String = "School of Information Science and Engineering",
+        degree: String = "Bachelor of Engineering in CS & Technology",
+        nationality: String = "International Student"
+    ): Result<ScholarAccount> {
+        val result = authManager.signUp(
+            name, email, studentId, password, confirmPassword,
+            university, department, degree, nationality
+        )
+        if (result.isSuccess) {
+            val account = result.getOrThrow()
+            prefs.edit()
+                .putBoolean("is_authenticated", true)
+                .putString("user_email", account.email)
+                .putString("student_id", account.studentId)
+                .putString("user_name", account.fullName)
+                .apply()
+
+            _currentUserEmail.value = account.email
+            _currentStudentId.value = account.studentId
+            _isAuthenticated.value = true
+            _currentScreen.value = AppScreen.DASHBOARD
+
+            viewModelScope.launch(Dispatchers.IO) {
+                repository.updateProfile(account.profile)
+            }
+            _toastEvent.value = "Welcome to CS Scholar OS, ${account.fullName}!"
+        }
+        return result
+    }
+
+    fun loginDemo() {
+        signIn("alexei.chen@ysu.edu.cn", "ysu_scholar_2026")
+    }
+
+    fun login(email: String, studentId: String) {
+        val account = authManager.getAccount(email) ?: authManager.getAccount(studentId)
+        if (account != null) {
+            signIn(account.email, "ysu_scholar_2026")
+        } else {
+            signUp(
+                name = if (email.contains("alexei", true)) "Alexei Chen-Kovalenko" else email.substringBefore("@"),
+                email = email.ifBlank { "alexei.chen@ysu.edu.cn" },
+                studentId = studentId.ifBlank { "2024CS0892" },
+                password = "ysu_scholar_2026",
+                confirmPassword = "ysu_scholar_2026",
+                university = "Yanshan University (燕山大学)",
+                department = "School of Information Science and Engineering",
+                degree = "Bachelor of Engineering in CS & Technology",
+                nationality = "International Student"
+            )
+        }
     }
 
     fun logout() {
         prefs.edit()
             .putBoolean("is_authenticated", false)
+            .remove("user_email")
+            .remove("student_id")
+            .remove("user_name")
             .apply()
 
+        _currentUserEmail.value = ""
+        _currentStudentId.value = ""
         _isAuthenticated.value = false
-        _toastEvent.value = "Logged out successfully"
+        _currentScreen.value = AppScreen.DASHBOARD
+        _toastEvent.value = "Signed out successfully"
     }
 
     fun resetDatabaseToDefaults() {
@@ -132,6 +222,10 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
     fun updateProfile(profile: UserProfileEntity) {
         viewModelScope.launch {
             repository.updateProfile(profile)
+            val email = _currentUserEmail.value
+            if (email.isNotBlank()) {
+                authManager.updateAccountProfile(email, profile)
+            }
             _toastEvent.value = "Profile updated successfully"
         }
     }
@@ -786,6 +880,27 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { repository.toggleSkill(id, completed) }
     }
 
+    fun insertSkill(skill: SkillItemEntity) {
+        viewModelScope.launch {
+            repository.insertSkill(skill)
+            _toastEvent.value = "Skill added"
+        }
+    }
+
+    fun updateSkill(skill: SkillItemEntity) {
+        viewModelScope.launch {
+            repository.updateSkill(skill)
+            _toastEvent.value = "Skill updated"
+        }
+    }
+
+    fun deleteSkill(skill: SkillItemEntity) {
+        viewModelScope.launch {
+            repository.deleteSkill(skill)
+            _toastEvent.value = "Skill removed"
+        }
+    }
+
     // Generated Projects
     val generatedProjects: StateFlow<List<GeneratedProjectEntity>> = repository.generatedProjects
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -1228,6 +1343,13 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun updateKnowledge(item: KnowledgeItemEntity) {
+        viewModelScope.launch {
+            repository.insertKnowledge(item)
+            _toastEvent.value = "Knowledge note updated"
+        }
+    }
+
     // Roadmap Goals
     val roadmapGoals: StateFlow<List<RoadmapGoalEntity>> = repository.roadmapGoals
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -1240,6 +1362,20 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             repository.insertGoal(goal)
             _toastEvent.value = "Goal saved"
+        }
+    }
+
+    fun updateGoal(goal: RoadmapGoalEntity) {
+        viewModelScope.launch {
+            repository.insertGoal(goal)
+            _toastEvent.value = "Goal updated"
+        }
+    }
+
+    fun deleteGoal(goal: RoadmapGoalEntity) {
+        viewModelScope.launch {
+            repository.deleteGoal(goal)
+            _toastEvent.value = "Goal removed"
         }
     }
 
@@ -1794,12 +1930,13 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
     ) { email, category, query ->
         Triple(email, category, query)
     }.flatMapLatest { (email, category, query) ->
+        val effectiveEmail = email.ifBlank { "alexei.chen@ysu.edu.cn" }
         if (query.isNotBlank()) {
-            repository.searchDocuments(email, query)
+            repository.searchDocuments(effectiveEmail, query)
         } else if (category != "ALL") {
-            repository.getDocumentsByCategory(email, category)
+            repository.getDocumentsByCategory(effectiveEmail, category)
         } else {
-            repository.getDocumentsForUser(email)
+            repository.getDocumentsForUser(effectiveEmail)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -1815,8 +1952,9 @@ class ScholarViewModel(application: Application) : AndroidViewModel(application)
         fileUriString: String = ""
     ) {
         viewModelScope.launch {
+            val effectiveEmail = _currentUserEmail.value.ifBlank { "alexei.chen@ysu.edu.cn" }
             val doc = PersonalDocumentEntity(
-                userEmail = _currentUserEmail.value,
+                userEmail = effectiveEmail,
                 fileName = fileName,
                 fileType = fileType.uppercase(),
                 category = category.uppercase(),

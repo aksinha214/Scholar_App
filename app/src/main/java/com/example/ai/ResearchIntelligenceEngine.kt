@@ -456,7 +456,8 @@ object ResearchIntelligenceEngine {
         milestones: List<ResearchMilestoneEntity>,
         experiments: List<ResearchExperimentEntity>,
         papers: List<ResearchPaperEntity>,
-        userNotes: String = ""
+        userNotes: String = "",
+        studentName: String = "International Graduate Scholar"
     ): AdvisorBrief {
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
@@ -527,7 +528,7 @@ object ResearchIntelligenceEngine {
         val md = buildString {
             append("# Weekly Research Advisor Brief\n")
             append("**Date:** $todayStr  \n")
-            append("**Student:** Alexei Chen-Kovalenko (International Graduate Scholar)  \n")
+            append("**Student:** $studentName  \n")
             append("**Advisor:** Prof. Zhang Lin (School of Information Science & Engineering)  \n")
             append("**Project:** ${project.title}  \n")
             append("**Target Venue:** ${project.targetVenue} | **Current Stage:** ${project.currentStatus}  \n\n")

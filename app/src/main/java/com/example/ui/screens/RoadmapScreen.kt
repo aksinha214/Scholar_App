@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.RoadmapGoalEntity
 import com.example.ui.components.FactBadge
+import com.example.ui.components.ModuleTabBar
 import com.example.ui.components.SectionHeader
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.ScholarViewModel
@@ -36,25 +37,19 @@ fun RoadmapScreen(viewModel: ScholarViewModel) {
 
     var futureQuestion by remember { mutableStateOf("Should I do a PhD in China/Singapore or pursue a direct R&D algorithm engineering job?") }
     var showAddGoalDialog by remember { mutableStateOf(false) }
+    var goalToEdit by remember { mutableStateOf<RoadmapGoalEntity?>(null) }
+    var goalToDelete by remember { mutableStateOf<RoadmapGoalEntity?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = ScholarCyan
-        ) {
-            tabs.forEachIndexed { i, title ->
-                Tab(
-                    selected = selectedTab == i,
-                    onClick = { selectedTab = i },
-                    text = { Text(title, fontSize = 11.5.sp, fontWeight = if (selectedTab == i) FontWeight.Bold else FontWeight.Normal) }
-                )
-            }
-        }
+        ModuleTabBar(
+            tabs = tabs,
+            selectedTab = selectedTab,
+            onTabSelected = { selectedTab = it }
+        )
 
         when (selectedTab) {
             0 -> LongTermTimelineView()
@@ -68,7 +63,9 @@ fun RoadmapScreen(viewModel: ScholarViewModel) {
             3 -> GoalsChecklistView(
                 goals = goals,
                 onToggle = { id, comp -> viewModel.toggleGoal(id, comp) },
-                onAddGoal = { showAddGoalDialog = true }
+                onAddGoal = { showAddGoalDialog = true },
+                onEditGoal = { goalToEdit = it },
+                onDeleteGoal = { goalToDelete = it }
             )
         }
     }
@@ -80,6 +77,29 @@ fun RoadmapScreen(viewModel: ScholarViewModel) {
                 viewModel.insertGoal(goal)
                 showAddGoalDialog = false
             }
+        )
+    }
+
+    if (goalToEdit != null) {
+        EditGoalDialog(
+            goal = goalToEdit!!,
+            onDismiss = { goalToEdit = null },
+            onConfirm = { updated ->
+                viewModel.updateGoal(updated)
+                goalToEdit = null
+            }
+        )
+    }
+
+    if (goalToDelete != null) {
+        com.example.ui.components.DeleteConfirmationDialog(
+            title = "Delete Goal",
+            message = "Are you sure you want to remove '${goalToDelete!!.title}'?",
+            onConfirm = {
+                viewModel.deleteGoal(goalToDelete!!)
+                goalToDelete = null
+            },
+            onDismiss = { goalToDelete = null }
         )
     }
 }
@@ -349,7 +369,9 @@ fun FutureSelfView(
 fun GoalsChecklistView(
     goals: List<RoadmapGoalEntity>,
     onToggle: (Long, Boolean) -> Unit,
-    onAddGoal: () -> Unit
+    onAddGoal: () -> Unit,
+    onEditGoal: (RoadmapGoalEntity) -> Unit,
+    onDeleteGoal: (RoadmapGoalEntity) -> Unit
 ) {
     val timeframes = listOf("Daily", "Weekly", "Semester", "Long-Term")
 
@@ -364,6 +386,18 @@ fun GoalsChecklistView(
                 actionText = "+ Add Goal",
                 onActionClick = onAddGoal
             )
+        }
+
+        if (goals.isEmpty()) {
+            item {
+                com.example.ui.components.EmptyStateView(
+                    icon = Icons.Default.Flag,
+                    title = "No Goals Set Yet",
+                    subtitle = "Define your semester targets, weekly milestones, or daily research sprints.",
+                    actionText = "+ Add First Goal",
+                    onAction = onAddGoal
+                )
+            }
         }
 
         timeframes.forEach { tf ->
@@ -381,7 +415,7 @@ fun GoalsChecklistView(
                 }
                 items(matching) { goal ->
                     Card(
-                        modifier = Modifier.fillMaxWidth().clickable { onToggle(goal.id, !goal.isCompleted) },
+                        modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
                             containerColor = if (goal.isCompleted) ScholarNavySurface else MaterialTheme.colorScheme.surfaceVariant
                         ),
@@ -407,6 +441,14 @@ fun GoalsChecklistView(
                                     color = ScholarGold
                                 )
                             }
+                            Row {
+                                IconButton(onClick = { onEditGoal(goal) }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit Goal", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                IconButton(onClick = { onDeleteGoal(goal) }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Goal", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }
@@ -421,6 +463,50 @@ data class TimelineNode(
     val description: String,
     val isCurrent: Boolean
 )
+
+@Composable
+fun EditGoalDialog(
+    goal: RoadmapGoalEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (RoadmapGoalEntity) -> Unit
+) {
+    var title by remember { mutableStateOf(goal.title) }
+    var timeframe by remember { mutableStateOf(goal.timeframe) }
+    var date by remember { mutableStateOf(goal.targetDate) }
+    var priority by remember { mutableStateOf(goal.priority) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Execution Goal", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Goal Title") })
+                OutlinedTextField(value = timeframe, onValueChange = { timeframe = it }, label = { Text("Timeframe (Daily, Weekly, Semester, Long-Term)") })
+                OutlinedTextField(value = date, onValueChange = { date = it }, label = { Text("Target Date") })
+                OutlinedTextField(value = priority, onValueChange = { priority = it }, label = { Text("Priority (High, Medium, Normal)") })
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(
+                            goal.copy(
+                                title = title.trim(),
+                                timeframe = timeframe.trim(),
+                                targetDate = date.trim(),
+                                priority = priority.trim()
+                            )
+                        )
+                    }
+                }
+            ) { Text("Save Changes") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
 
 @Composable
 fun AddGoalDialog(

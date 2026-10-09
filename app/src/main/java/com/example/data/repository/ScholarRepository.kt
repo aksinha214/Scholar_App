@@ -118,6 +118,7 @@ class ScholarRepository(private val db: AppDatabase) {
     suspend fun toggleSkill(id: Long, completed: Boolean) = db.skillDao().toggleSkill(id, completed)
     suspend fun insertSkill(skill: SkillItemEntity) = db.skillDao().insertSkill(skill)
     suspend fun updateSkill(skill: SkillItemEntity) = db.skillDao().updateSkill(skill)
+    suspend fun deleteSkill(skill: SkillItemEntity) = db.skillDao().deleteSkill(skill)
 
     // Generated Projects
     val generatedProjects: Flow<List<GeneratedProjectEntity>> = db.projectGeneratorDao().getAllGeneratedProjects()

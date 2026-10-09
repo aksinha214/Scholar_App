@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.*
 import com.example.data.model.*
 import com.example.ui.components.FactBadge
+import com.example.ui.components.ModuleTabBar
 import com.example.ui.components.SectionHeader
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.ScholarViewModel
@@ -81,7 +82,9 @@ fun CareerScreen(viewModel: ScholarViewModel) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
-    Scaffold { padding ->
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -122,27 +125,12 @@ fun CareerScreen(viewModel: ScholarViewModel) {
                 }
             }
 
-            // Scrollable Tab Row
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                edgePadding = 16.dp,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = DarkPrimary
-            ) {
-                tabs.forEachIndexed { idx, title ->
-                    Tab(
-                        selected = selectedTab == idx,
-                        onClick = { selectedTab = idx },
-                        text = {
-                            Text(
-                                text = title,
-                                fontSize = 12.sp,
-                                fontWeight = if (selectedTab == idx) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
-                }
-            }
+            // Unified Tab Row
+            ModuleTabBar(
+                tabs = tabs,
+                selectedTab = selectedTab,
+                onTabSelected = { selectedTab = it }
+            )
 
             // Tab Content
             when (selectedTab) {

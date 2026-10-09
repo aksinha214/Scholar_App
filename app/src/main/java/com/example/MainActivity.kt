@@ -105,43 +105,46 @@ fun MainAppShell(viewModel: ScholarViewModel) {
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
+                    Column(verticalArrangement = Arrangement.Center) {
                         Text(
                             text = "CS Scholar OS",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 16.sp
                             )
                         )
                         Text(
                             text = currentScreen.title,
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = ScholarCyan,
-                                fontSize = 11.sp
-                            )
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            maxLines = 1
                         )
                     }
                 },
                 navigationIcon = {
                     if (currentScreen != AppScreen.DASHBOARD) {
                         IconButton(onClick = { viewModel.navigateTo(AppScreen.DASHBOARD) }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Dashboard")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Dashboard", modifier = Modifier.size(22.dp))
                         }
                     } else {
                         IconButton(onClick = { showModuleSheet = true }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Modules Menu", tint = DarkPrimary)
+                            Icon(Icons.Default.Menu, contentDescription = "Modules Menu", tint = DarkPrimary, modifier = Modifier.size(22.dp))
                         }
                     }
                 },
                 actions = {
                     IconButton(onClick = { showModuleSheet = true }) {
-                        Icon(Icons.Default.Apps, contentDescription = "All 12 Modules", tint = ScholarCyan)
+                        Icon(Icons.Default.Apps, contentDescription = "All Modules", tint = ScholarCyan, modifier = Modifier.size(22.dp))
                     }
                     IconButton(onClick = { viewModel.navigateTo(AppScreen.PROFILE) }) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = ScholarGold)
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile", tint = ScholarGold, modifier = Modifier.size(22.dp))
                     }
                     IconButton(onClick = { viewModel.logout() }) {
-                        Icon(Icons.Default.Logout, contentDescription = "Sign Out", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.Logout, contentDescription = "Sign Out", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -151,7 +154,9 @@ fun MainAppShell(viewModel: ScholarViewModel) {
         },
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp,
+                windowInsets = NavigationBarDefaults.windowInsets
             ) {
                 val primaryScreens = listOf(
                     AppScreen.DASHBOARD to Icons.Default.Dashboard,
@@ -166,11 +171,14 @@ fun MainAppShell(viewModel: ScholarViewModel) {
                     NavigationBarItem(
                         selected = isSelected,
                         onClick = { viewModel.navigateTo(screen) },
-                        icon = { Icon(icon, contentDescription = screen.title) },
-                        label = { Text(screen.title, fontSize = 10.5.sp, maxLines = 1) },
+                        icon = { Icon(icon, contentDescription = screen.title, modifier = Modifier.size(20.dp)) },
+                        label = { Text(screen.title, fontSize = 10.sp, maxLines = 1, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        alwaysShowLabel = true,
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                            indicatorColor = DarkPrimary
+                            indicatorColor = DarkPrimary,
+                            selectedTextColor = ScholarCyan,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     )
                 }

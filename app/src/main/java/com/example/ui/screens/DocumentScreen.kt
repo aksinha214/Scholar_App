@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
+import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -25,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.*
 import com.example.data.model.PersonalDocumentEntity
 import com.example.ui.components.FactBadge
+import com.example.ui.components.ModuleTabBar
 import com.example.ui.components.SectionHeader
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.ScholarViewModel
@@ -45,31 +49,18 @@ fun DocumentScreen(viewModel: ScholarViewModel) {
     var viewingDocument by remember { mutableStateOf<PersonalDocumentEntity?>(null) }
     var editingDocument by remember { mutableStateOf<PersonalDocumentEntity?>(null) }
     var documentForActions by remember { mutableStateOf<PersonalDocumentEntity?>(null) }
+    var docToDelete by remember { mutableStateOf<PersonalDocumentEntity?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = ScholarCyan
-        ) {
-            tabs.forEachIndexed { idx, title ->
-                Tab(
-                    selected = selectedTab == idx,
-                    onClick = { selectedTab = idx },
-                    text = {
-                        Text(
-                            text = title,
-                            fontSize = 12.sp,
-                            fontWeight = if (selectedTab == idx) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                )
-            }
-        }
+        ModuleTabBar(
+            tabs = tabs,
+            selectedTab = selectedTab,
+            onTabSelected = { selectedTab = it }
+        )
 
         when (selectedTab) {
             0 -> DocumentLibraryTab(
@@ -87,7 +78,7 @@ fun DocumentScreen(viewModel: ScholarViewModel) {
                 onSummarize = { viewModel.summarizeDocument(it) },
                 onExtractActions = { documentForActions = it },
                 onEdit = { editingDocument = it },
-                onDelete = { viewModel.deleteDocument(it) }
+                onDelete = { docToDelete = it }
             )
             1 -> AskMyDocumentsTab(
                 askResult = askResult,
@@ -96,6 +87,18 @@ fun DocumentScreen(viewModel: ScholarViewModel) {
             )
             2 -> KnowledgeNotesTab(viewModel)
         }
+    }
+
+    if (docToDelete != null) {
+        com.example.ui.components.DeleteConfirmationDialog(
+            title = "Delete Document",
+            message = "Are you sure you want to delete '${docToDelete!!.fileName}' from your personal library?",
+            onConfirm = {
+                viewModel.deleteDocument(docToDelete!!)
+                docToDelete = null
+            },
+            onDismiss = { docToDelete = null }
+        )
     }
 
     // Dialogs
@@ -184,17 +187,36 @@ fun DocumentLibraryTab(
     ) {
         item {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SectionHeader(
-                    title = "Personal Document Library",
-                    subtitle = "Organize syllabi, manuscripts, notes, and certificates"
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Personal Document Library",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    )
+                    Text(
+                        text = "Organize syllabi, manuscripts, notes, and certificates",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
                 Button(
                     onClick = onUploadClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = DarkPrimary, contentColor = DarkOnPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkPrimary, contentColor = DarkOnPrimary),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.height(36.dp)
                 ) {
                     Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -243,23 +265,13 @@ fun DocumentLibraryTab(
 
         if (documents.isEmpty()) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("No documents found in '$activeCategory'", style = MaterialTheme.typography.titleSmall)
-                        Text("Click '+ Upload' to import notes, syllabi, or papers.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+                com.example.ui.components.EmptyStateView(
+                    icon = Icons.Default.FolderOpen,
+                    title = "No documents found in '$activeCategory'",
+                    subtitle = if (searchQuery.isNotBlank()) "No files match query '$searchQuery'." else "Import syllabi, research papers, course notes, or assignment prompts.",
+                    actionText = "+ Upload Document",
+                    onAction = onUploadClick
+                )
             }
         }
 
@@ -623,6 +635,8 @@ fun KnowledgeNotesTab(viewModel: ScholarViewModel) {
     val items by viewModel.knowledgeItems.collectAsStateWithLifecycle()
     val search by viewModel.searchQuery.collectAsStateWithLifecycle()
     var showAddNoteDialog by remember { mutableStateOf(false) }
+    var noteToEdit by remember { mutableStateOf<com.example.data.model.KnowledgeItemEntity?>(null) }
+    var noteToDelete by remember { mutableStateOf<com.example.data.model.KnowledgeItemEntity?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -657,6 +671,18 @@ fun KnowledgeNotesTab(viewModel: ScholarViewModel) {
             )
         }
 
+        if (items.isEmpty()) {
+            item {
+                com.example.ui.components.EmptyStateView(
+                    icon = Icons.Default.Description,
+                    title = "No Knowledge Notes Found",
+                    subtitle = if (search.isNotBlank()) "No notes matching '$search'." else "Create your first knowledge snippet or campus survival note.",
+                    actionText = "+ Add Note",
+                    onAction = { showAddNoteDialog = true }
+                )
+            }
+        }
+
         items(items) { item ->
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -669,8 +695,13 @@ fun KnowledgeNotesTab(viewModel: ScholarViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(item.category.uppercase(), style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = ScholarCyan))
-                        IconButton(onClick = { viewModel.deleteKnowledge(item) }) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                        Row {
+                            IconButton(onClick = { noteToEdit = item }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Note", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(onClick = { noteToDelete = item }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Note", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                     Text(item.title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
@@ -692,6 +723,29 @@ fun KnowledgeNotesTab(viewModel: ScholarViewModel) {
             }
         )
     }
+
+    if (noteToEdit != null) {
+        EditKnowledgeDialog(
+            note = noteToEdit!!,
+            onDismiss = { noteToEdit = null },
+            onConfirm = { updated ->
+                viewModel.updateKnowledge(updated)
+                noteToEdit = null
+            }
+        )
+    }
+
+    if (noteToDelete != null) {
+        com.example.ui.components.DeleteConfirmationDialog(
+            title = "Delete Knowledge Note",
+            message = "Are you sure you want to delete note '${noteToDelete!!.title}'?",
+            onConfirm = {
+                viewModel.deleteKnowledge(noteToDelete!!)
+                noteToDelete = null
+            },
+            onDismiss = { noteToDelete = null }
+        )
+    }
 }
 
 // ----------------------------------------------------
@@ -704,6 +758,7 @@ fun UploadDocumentDialog(
     onConfirm: (name: String, type: String, cat: String, content: String, tags: String, notes: String, course: String, isBinary: Boolean, uriStr: String) -> Unit
 ) {
     val context = LocalContext.current
+    var uploadMode by remember { mutableStateOf(0) } // 0 = File Import, 1 = Plain-Text Note
     var fileName by remember { mutableStateOf("") }
     var fileType by remember { mutableStateOf("TXT") }
     var category by remember { mutableStateOf("ACADEMIC") }
@@ -716,24 +771,55 @@ fun UploadDocumentDialog(
 
     val categories = listOf("ACADEMIC", "RESEARCH", "PROJECTS", "CAREER", "CHINESE", "UNIVERSITY", "PERSONAL", "OTHER")
 
-    val filePicker = rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri: Uri? ->
+    val academicMimes = remember {
+        arrayOf(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/plain",
+            "text/markdown",
+            "image/jpeg",
+            "image/png",
+            "*/*"
+        )
+    }
+
+    val filePicker = rememberLauncherForActivityResult(contract = ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri?.let {
             fileUriString = uri.toString()
-            val rawName = uri.lastPathSegment?.substringAfterLast('/') ?: "Uploaded_Document"
-            fileName = rawName
-            val ext = rawName.substringAfterLast('.', "").uppercase()
-            fileType = if (ext.isNotBlank()) ext else "TXT"
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            val resolvedName = cursor?.use { c ->
+                if (c.moveToFirst()) {
+                    val nameIdx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx != -1) c.getString(nameIdx) else null
+                } else null
+            } ?: uri.lastPathSegment?.substringAfterLast('/') ?: "academic_document"
+
+            fileName = resolvedName
+            val ext = resolvedName.substringAfterLast('.', "").uppercase()
+            fileType = if (ext.isNotBlank()) ext else "FILE"
 
             when (fileType) {
-                "PDF", "DOCX", "PPTX" -> {
+                "PDF", "DOC", "DOCX", "PPT", "PPTX", "XLS", "XLSX" -> {
                     isBinaryUnsupported = true
-                    content = "[Binary ${fileType} document stored in your personal library. On-device text parsing for binary ${fileType} files is scheduled for the desktop indexer. Metadata, course association, and notes are indexed for search.]"
+                    content = "[Binary ${fileType} document stored in your library. Full text parsing for binary ${fileType} files is not run locally on device. File can be opened via system apps and searched via title, notes, and tags.]"
                 }
                 "PNG", "JPG", "JPEG", "WEBP" -> {
                     isBinaryUnsupported = true
-                    content = "[Image visual asset stored. On-device optical character recognition available via Document Scanner.]"
+                    content = "[Visual image asset stored. Image can be previewed or opened via system gallery.]"
                 }
-                else -> {
+                "TXT", "MD", "MARKDOWN", "CSV", "JSON", "PY", "CPP", "JAVA" -> {
                     isBinaryUnsupported = false
                     try {
                         val stream = context.contentResolver.openInputStream(uri)
@@ -742,33 +828,76 @@ fun UploadDocumentDialog(
                         content = ""
                     }
                 }
+                else -> {
+                    isBinaryUnsupported = true
+                    content = "[File ${fileType} document stored. Content available via external viewer.]"
+                }
             }
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Upload Document to Library") },
+        title = {
+            Text(if (uploadMode == 0) "Import Document File" else "Create Plain-Text Note", fontWeight = FontWeight.Bold)
+        },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
-                    Button(
-                        onClick = { filePicker.launch("*/*") },
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.FileOpen, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Pick File from Device (TXT, MD, PDF, DOCX)")
+                        FilterChip(
+                            selected = uploadMode == 0,
+                            onClick = { uploadMode = 0 },
+                            label = { Text("File Import", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = uploadMode == 1,
+                            onClick = {
+                                uploadMode = 1
+                                fileType = "TXT"
+                                isBinaryUnsupported = false
+                            },
+                            label = { Text("Text Note", fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
+
+                if (uploadMode == 0) {
+                    item {
+                        Button(
+                            onClick = { filePicker.launch(academicMimes) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkPrimary, contentColor = DarkOnPrimary)
+                        ) {
+                            Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Select File (PDF, DOCX, PPTX, TXT, MD, Images)")
+                        }
+                    }
+                    if (fileUriString.isNotBlank()) {
+                        item {
+                            Surface(color = ScholarCyan.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth()) {
+                                Text("Selected: $fileName ($fileType)", modifier = Modifier.padding(8.dp), fontSize = 11.5.sp, color = ScholarCyan)
+                            }
+                        }
+                    }
+                }
+
                 item {
-                    OutlinedTextField(value = fileName, onValueChange = { fileName = it }, label = { Text("File Name") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = fileName,
+                        onValueChange = { fileName = it },
+                        label = { Text(if (uploadMode == 0) "Document Filename *" else "Note Title *") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 item {
-                    OutlinedTextField(value = fileType, onValueChange = { fileType = it }, label = { Text("File Type (TXT, MD, PDF, DOCX, PPTX)") }, modifier = Modifier.fillMaxWidth())
-                }
-                item {
-                    Text("Select Category:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    Text("Select Category:", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = ScholarCyan))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(categories) { cat ->
                             FilterChip(
@@ -780,16 +909,36 @@ fun UploadDocumentDialog(
                     }
                 }
                 item {
-                    OutlinedTextField(value = courseOrProject, onValueChange = { courseOrProject = it }, label = { Text("Course or Project Association") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = courseOrProject,
+                        onValueChange = { courseOrProject = it },
+                        label = { Text("Associated Course or Project") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 item {
-                    OutlinedTextField(value = tags, onValueChange = { tags = it }, label = { Text("Tags (e.g. syllabus, deadlines, cvpr)") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = tags,
+                        onValueChange = { tags = it },
+                        label = { Text("Tags (comma-separated)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 item {
-                    OutlinedTextField(value = userNotes, onValueChange = { userNotes = it }, label = { Text("Personal Notes") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = userNotes,
+                        onValueChange = { userNotes = it },
+                        label = { Text("Personal Description / Notes") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 item {
-                    OutlinedTextField(value = content, onValueChange = { content = it }, label = { Text("Document Content / Extracted Text") }, modifier = Modifier.fillMaxWidth().height(100.dp))
+                    OutlinedTextField(
+                        value = content,
+                        onValueChange = { content = it },
+                        label = { Text(if (uploadMode == 0) "Extracted / Indexed Text" else "Note Content *") },
+                        modifier = Modifier.fillMaxWidth().height(110.dp)
+                    )
                 }
             }
         },
@@ -815,12 +964,14 @@ fun ViewDocumentDialog(
     onAsk: () -> Unit,
     onSummarize: () -> Unit
 ) {
+    val context = LocalContext.current
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
                 Text(doc.fileName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("${doc.category} • ${doc.fileType} • Uploaded: ${doc.uploadDate}", fontSize = 11.sp, color = ScholarCyan)
+                Text("${doc.category} • ${doc.fileType} • Added: ${doc.uploadDate}", fontSize = 11.sp, color = ScholarCyan)
             }
         },
         text = {
@@ -856,12 +1007,77 @@ fun ViewDocumentDialog(
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Button(onClick = onAsk) { Text("Ask", fontSize = 12.sp) }
-                OutlinedButton(onClick = onSummarize) { Text("Summarize", fontSize = 12.sp) }
+                if (doc.fileUriString.isNotBlank()) {
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    val mime = when (doc.fileType.uppercase()) {
+                                        "PDF" -> "application/pdf"
+                                        "DOC", "DOCX" -> "application/msword"
+                                        "PPT", "PPTX" -> "application/vnd.ms-powerpoint"
+                                        "XLS", "XLSX" -> "application/vnd.ms-excel"
+                                        "PNG", "JPG", "JPEG" -> "image/*"
+                                        "TXT", "MD" -> "text/plain"
+                                        else -> "*/*"
+                                    }
+                                    setDataAndType(Uri.parse(doc.fileUriString), mime)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "No app available to open this file format", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Open File", fontSize = 11.5.sp)
+                    }
+                }
+                OutlinedButton(onClick = onAsk) { Text("Ask AI", fontSize = 11.5.sp) }
+                OutlinedButton(onClick = onSummarize) { Text("Summarize", fontSize = 11.5.sp) }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+@Composable
+fun EditKnowledgeDialog(
+    note: com.example.data.model.KnowledgeItemEntity,
+    onDismiss: () -> Unit,
+    onConfirm: (com.example.data.model.KnowledgeItemEntity) -> Unit
+) {
+    var title by remember { mutableStateOf(note.title) }
+    var category by remember { mutableStateOf(note.category) }
+    var content by remember { mutableStateOf(note.content) }
+    var tags by remember { mutableStateOf(note.tags) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Knowledge Note", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = content, onValueChange = { content = it }, label = { Text("Content") }, modifier = Modifier.fillMaxWidth().height(100.dp))
+                OutlinedTextField(value = tags, onValueChange = { tags = it }, label = { Text("Tags") }, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onConfirm(note.copy(title = title.trim(), category = category.trim(), content = content.trim(), tags = tags.trim()))
+                    }
+                }
+            ) { Text("Save Changes") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }
